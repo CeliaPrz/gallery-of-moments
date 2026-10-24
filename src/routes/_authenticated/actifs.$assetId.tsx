@@ -118,8 +118,8 @@ function AssetSheetPage() {
 
   return (
     <LurShell
-      isAdmin={false}
-      fullName={data.investor.name ? data.investor.code : ""}
+      isAdmin={data.isAdmin}
+      fullName={data.fullName}
       investorName={data.investor.name}
       assetsCount={null}
       lastImportLabel={data.source ? formatDate(data.source.importedAt) : null}
