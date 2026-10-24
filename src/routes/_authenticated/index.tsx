@@ -18,7 +18,7 @@ const dashboardQueryOptions = queryOptions({
   queryFn: () => getDashboard(),
 });
 
-export const Route = createFileRoute("/_authenticated/index")({
+export const Route = createFileRoute("/_authenticated/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(dashboardQueryOptions),
   head: () => ({
     meta: [
