@@ -1,5 +1,6 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
 
+import { supabase } from "./integrations/supabase/client";
 import { renderErrorPage } from "./lib/error-page";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
@@ -24,6 +25,21 @@ const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",
 });
 
+// Attache le jeton de session Supabase aux appels de fonctions serveur, afin
+// que les règles de sécurité en base s'appliquent au nom de l'utilisateur.
+const attachSupabaseAuth = createMiddleware({ type: "function" }).client(
+  async ({ next, clientHandler, request }) => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) {
+      return next({ clientHandler });
+    }
+    const headers = new Headers(request?.headers as HeadersInit | undefined);
+    headers.set("Authorization", `Bearer ${data.session.access_token}`);
+    return next({ request: { ...request, headers }, clientHandler });
+  },
+);
+
 export const startInstance = createStart(() => ({
   requestMiddleware: [errorMiddleware, csrfMiddleware],
+  functionMiddleware: [attachSupabaseAuth],
 }));
