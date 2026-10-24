@@ -1,23 +1,18 @@
 import { useState, type ReactNode } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { queryOptions } from "@tanstack/react-query";
-import { getDashboard, whoami } from "@/server/lur.functions";
 
-export function MaterialIcon({ name, className = "" }: { name: string; className?: string }) {
-  return (
-    <span aria-hidden="true" className={`material-symbols-outlined ${className}`}>
-      {name}
-    </span>
-  );
-}
+import { MaterialIcon } from "@/components/material-icon";
+import { supabase } from "@/integrations/supabase/client";
 
-type NavItem = { label: string; icon: string; href?: string; anchor?: boolean };
+type NavItem =
+  | { label: string; icon: string; to: "/" | "/import" }
+  | { label: string; icon: string; anchor: "#actifs" }
+  | { label: string; icon: string };
 
 const INVESTOR_NAV: NavItem[] = [
-  { label: "Tableau de bord", icon: "grid_view", href: "/" },
-  { label: "Actifs", icon: "apartment", href: "#actifs", anchor: true },
+  { label: "Tableau de bord", icon: "grid_view", to: "/" },
+  { label: "Actifs", icon: "apartment", anchor: "#actifs" },
   { label: "Rapports", icon: "analytics" },
   { label: "Documents", icon: "folder_open" },
 ];
@@ -26,8 +21,8 @@ const ADMIN_NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Portefeuille",
     items: [
-      { label: "Tableau de bord", icon: "dashboard", href: "/" },
-      { label: "Actifs", icon: "domain", href: "#actifs", anchor: true },
+      { label: "Tableau de bord", icon: "dashboard", to: "/" },
+      { label: "Actifs", icon: "domain", anchor: "#actifs" },
       { label: "Rapports", icon: "bar_chart" },
       { label: "Documents", icon: "folder_open" },
     ],
@@ -36,7 +31,7 @@ const ADMIN_NAV: { group: string; items: NavItem[] }[] = [
     group: "Administration",
     items: [
       { label: "Investisseurs", icon: "groups" },
-      { label: "Import", icon: "upload_file", href: "/import" },
+      { label: "Import", icon: "upload_file", to: "/import" },
       { label: "Historique des imports", icon: "history" },
       { label: "Rapports admin", icon: "analytics" },
     ],
@@ -50,7 +45,7 @@ function NavButton({
 }: {
   item: NavItem;
   active: boolean;
-  onNavigate?: () => void;
+  onNavigate: () => void;
 }) {
   const classes = `flex w-full items-center gap-3 rounded-lg px-3 py-2 font-body-md text-[13px] transition-colors ${
     active
@@ -58,18 +53,18 @@ function NavButton({
       : "text-sidebar-foreground/80 hover:bg-surface-container-lowest/10 hover:text-sidebar-foreground"
   }`;
 
-  if (item.href && item.anchor) {
+  if ("anchor" in item) {
     return (
-      <a href={item.href} className={classes} onClick={onNavigate}>
+      <a href={item.anchor} className={classes} onClick={onNavigate}>
         <MaterialIcon name={item.icon} className="text-[20px]" />
         <span>{item.label}</span>
       </a>
     );
   }
 
-  if (item.href) {
+  if ("to" in item) {
     return (
-      <Link to={item.href} className={classes} onClick={onNavigate}>
+      <Link to={item.to} className={classes} onClick={onNavigate}>
         <MaterialIcon name={item.icon} className="text-[20px]" />
         <span>{item.label}</span>
       </Link>
@@ -89,7 +84,6 @@ export function LurShell({
   isAdmin,
   fullName,
   investorName,
-  investorCode,
   assetsCount,
   lastImportLabel,
 }: {
@@ -97,19 +91,19 @@ export function LurShell({
   isAdmin: boolean;
   fullName: string;
   investorName: string;
-  investorCode: string;
   assetsCount: number | null;
   lastImportLabel: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const currentPath = useRouterState({ select: (router) => router.location.pathname });
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   async function signOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
     await supabase.auth.signOut();
-    window.location.assign("/auth");
+    navigate({ to: "/auth", replace: true });
   }
 
   const initials = fullName
@@ -118,6 +112,8 @@ export function LurShell({
     .map((part) => part.charAt(0))
     .join("")
     .toUpperCase();
+
+  const navItems = isAdmin ? ADMIN_NAV.flatMap((section) => section.items) : INVESTOR_NAV;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -158,7 +154,7 @@ export function LurShell({
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-6">
+        <nav className="flex-1 overflow-y-auto px-4 py-6">
           {isAdmin ? (
             ADMIN_NAV.map((section) => (
               <div key={section.group} className="mb-6">
@@ -170,7 +166,7 @@ export function LurShell({
                     <NavButton
                       key={item.label}
                       item={item}
-                      active={Boolean(item.href && !item.anchor && currentPath === item.href)}
+                      active={"to" in item && currentPath === item.to}
                       onNavigate={() => setOpen(false)}
                     />
                   ))}
@@ -183,7 +179,7 @@ export function LurShell({
                 <NavButton
                   key={item.label}
                   item={item}
-                  active={Boolean(item.href && !item.anchor && currentPath === item.href)}
+                  active={"to" in item && currentPath === item.to}
                   onNavigate={() => setOpen(false)}
                 />
               ))}
@@ -244,12 +240,4 @@ export function LurShell({
   );
 }
 
-export const dashboardQueryOptions = queryOptions({
-  queryKey: ["dashboard"],
-  queryFn: () => getDashboard(),
-});
-
-export const whoamiQueryOptions = queryOptions({
-  queryKey: ["whoami"],
-  queryFn: () => whoami(),
-});
+export { navItems };
