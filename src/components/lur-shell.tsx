@@ -113,7 +113,6 @@ export function LurShell({
     .join("")
     .toUpperCase();
 
-  const navItems = isAdmin ? ADMIN_NAV.flatMap((section) => section.items) : INVESTOR_NAV;
 
   return (
     <div className="min-h-screen bg-surface">
