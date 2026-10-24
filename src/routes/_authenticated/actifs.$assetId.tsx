@@ -25,7 +25,7 @@ const assetQueryOptions = (assetId: string) =>
     queryFn: () => getAssetSheet({ data: assetId }),
   });
 
-export const Route = createFileRoute("/_authenticated/actifs.$assetId")({
+export const Route = createFileRoute("/_authenticated/actifs/$assetId")({
   loader: ({ params, context }) =>
     context.queryClient.ensureQueryData(assetQueryOptions(params.assetId)),
   head: () => ({
