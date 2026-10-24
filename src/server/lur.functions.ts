@@ -297,7 +297,7 @@ export const getDashboard = createServerFn({ method: "GET" })
     const { data: summaries } = await supabase
       .from("asset_summary")
       .select(
-        "asset_id, name, city, lettable_area_sqm, market_value, occupancy_rate, ltv, annual_rent, vacant_area_sqm, import_id",
+        "asset_id, name, city, lettable_area_sqm, market_value, occupancy_rate, ltv, annual_rent, vacant_area_sqm, import_id, investor_id",
       )
       .order("name");
 

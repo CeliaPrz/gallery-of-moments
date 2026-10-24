@@ -76,7 +76,7 @@ async function parseWorkbook(file: File): Promise<Parsed> {
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true, dateNF: "dd/mm/yyyy" });
 
   const sheets: Sheet[] = workbook.SheetNames.map((name) => {
-    const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(workbook.Sheets[name], {
+    const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(workbook.Sheets[name]!, {
       header: 1,
       blankrows: false,
       defval: null,

@@ -111,10 +111,10 @@ function AssetSheetPage() {
   const loan = data.loan;
   const covenantNear =
     data.summary.ltv != null &&
-    loan?.ltv_covenant != null &&
-    data.summary.ltv >= loan.ltv_covenant * COVENANT_PROXIMITY_RATIO;
+    loan?.ltvCovenant != null &&
+    data.summary.ltv >= loan.ltvCovenant * COVENANT_PROXIMITY_RATIO;
   const icrConforme =
-    loan?.icr != null && loan?.icr_covenant != null ? loan.icr > loan.icr_covenant : null;
+    loan?.icr != null && loan?.icrCovenant != null ? loan.icr > loan.icrCovenant : null;
 
   return (
     <LurShell
@@ -260,7 +260,7 @@ function AssetSheetPage() {
                 {formatPercent(data.summary.ltv)}
               </p>
               <p className="mt-1 font-body-sm text-secondary">
-                / max {formatPercent(loan?.ltv_covenant ?? null)}
+                / max {formatPercent(loan?.ltvCovenant ?? null)}
               </p>
             </div>
           </section>
@@ -383,7 +383,7 @@ function AssetSheetPage() {
                       {formatMultiple(loan.icr)}
                     </p>
                     <p className="mt-1 font-body-sm text-secondary">
-                      Covenant : &gt; {formatPercent(loan.icr_covenant)} (
+                      Covenant : &gt; {formatPercent(loan.icrCovenant)} (
                       {icrConforme === null ? "—" : icrConforme ? "Conforme" : "Non conforme"})
                     </p>
                   </div>
@@ -398,7 +398,7 @@ function AssetSheetPage() {
                       </p>
                     </div>
                     <p className="font-table-data text-table-data text-on-surface">
-                      {formatPercent(loan.ltv)} <span className="text-secondary">/ Seuil max {formatPercent(loan.ltv_covenant)}</span>
+                      {formatPercent(loan.ltv)} <span className="text-secondary">/ Seuil max {formatPercent(loan.ltvCovenant)}</span>
                     </p>
                   </div>
                   <div className="mt-3 h-2 rounded-full bg-surface-container-high">
@@ -407,8 +407,8 @@ function AssetSheetPage() {
                       style={{
                         width: `${Math.min(
                           100,
-                          loan.ltv != null && loan.ltv_covenant != null
-                            ? (loan.ltv / loan.ltv_covenant) * 100
+                          loan.ltv != null && loan.ltvCovenant != null
+                            ? (loan.ltv / loan.ltvCovenant) * 100
                             : 0,
                         )}%`,
                       }}

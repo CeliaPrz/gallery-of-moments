@@ -127,7 +127,7 @@ function AuthPage() {
               <p className="font-body-md text-sm text-secondary">Portail institutionnel sécurisé</p>
             </div>
 
-            <form className="space-y-5" novalidate onSubmit={submit}>
+            <form className="space-y-5" noValidate onSubmit={submit}>
               <div>
                 <label
                   className="mb-2 block font-label-md text-[11px] uppercase tracking-wider text-secondary"

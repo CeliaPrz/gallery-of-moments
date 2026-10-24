@@ -1,6 +1,6 @@
 import type { SourceRibbon } from "@/server/lur.functions";
 import { formatDate } from "@/lib/format";
-import { MaterialIcon } from "@/components/lur-shell";
+import { MaterialIcon } from "@/components/material-icon";
 
 export function SourceRibbonBar({ source }: { source: SourceRibbon | null }) {
   if (!source) return null;

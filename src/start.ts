@@ -18,26 +18,22 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
-// Start installs this automatically when src/start.ts is absent; defining the
-// file opts out, so re-add it explicitly to keep server functions protected
-// from cross-site requests.
+// Start installe cette protection automatiquement quand src/start.ts est absent ;
+// définir le fichier désactive l'installation automatique, on la réajoute donc
+// explicitement pour protéger les fonctions serveur des requêtes cross-site.
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",
 });
 
-// Attache le jeton de session Supabase aux appels de fonctions serveur, afin
-// que les règles de sécurité en base s'appliquent au nom de l'utilisateur.
-const attachSupabaseAuth = createMiddleware({ type: "function" }).client(
-  async ({ next, clientHandler, request }) => {
-    const { data, error } = await supabase.auth.getSession();
-    if (error || !data.session) {
-      return next({ clientHandler });
-    }
-    const headers = new Headers(request?.headers as HeadersInit | undefined);
-    headers.set("Authorization", `Bearer ${data.session.access_token}`);
-    return next({ request: { ...request, headers }, clientHandler });
-  },
-);
+// Attache le jeton de session Supabase aux appels de fonctions serveur, afin que
+// les règles de sécurité en base s'appliquent au nom de l'utilisateur connecté.
+const attachSupabaseAuth = createMiddleware({ type: "function" }).client(async ({ next }) => {
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session) {
+    return next();
+  }
+  return next({ headers: { Authorization: `Bearer ${data.session.access_token}` } });
+});
 
 export const startInstance = createStart(() => ({
   requestMiddleware: [errorMiddleware, csrfMiddleware],
