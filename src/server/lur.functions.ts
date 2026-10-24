@@ -80,6 +80,8 @@ export type LeaseRowDto = {
 };
 
 export type AssetSheetDto = {
+  fullName: string;
+  isAdmin: boolean;
   asset: {
     id: string;
     name: string;
@@ -434,6 +436,12 @@ export const getAssetSheet = createServerFn({ method: "GET" })
 
     if (!asset) throw new Error("Actif introuvable ou non autorisé.");
 
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", context.userId)
+      .maybeSingle();
+
     const { data: summary } = await supabase
       .from("asset_summary")
       .select(
@@ -532,6 +540,8 @@ export const getAssetSheet = createServerFn({ method: "GET" })
     );
 
     return {
+      fullName: profile?.full_name ?? "",
+      isAdmin: profile?.role === "admin",
       asset: {
         id: asset.id,
         name: asset.name,
