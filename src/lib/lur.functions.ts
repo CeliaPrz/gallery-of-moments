@@ -433,7 +433,7 @@ export const getAssetSheet = createServerFn({ method: "GET" })
     }
 
     const alerts = buildAlerts(
-      [{ assetId, name: asset.name, vacantAreaSqm: summary?.vacant_area_sqm ?? null }],
+      [{ assetId, name: asset.name }],
       loan ? [{ asset_id: assetId, ltv: loan.ltv, ltv_covenant: loan.ltv_covenant }] : [],
       (leaseRows ?? [])
         .filter((row: any) => row.end_date && row.tenant?.name)
