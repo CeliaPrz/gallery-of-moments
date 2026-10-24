@@ -269,30 +269,23 @@ export const getDashboard = createServerFn({ method: "GET" })
       .eq("id", context.userId)
       .maybeSingle();
 
+    const { data: investorList } = await supabase
+      .from("investors")
+      .select("id, name, code")
+      .order("code");
+
     const { data: portfolios } = await supabase
       .from("portfolio_summary")
       .select(
         "investor_id, assets_count, latest_data_date, total_value, total_annual_rent, occupancy_rate, portfolio_ltv",
-      )
-      .order("investor_id");
+      );
 
     // L'administratrice n'est rattachée à aucun fonds : elle consulte le premier
     // portefeuille par ordre de code.
-    const portfolio = profile?.investor_id
-      ? portfolios?.find((p) => p.investor_id === profile.investor_id)
-      : portfolios?.[0];
-
-    const investorId = portfolio?.investor_id ?? null;
-
-    let investor: { name: string; code: string } | null = null;
-    if (investorId) {
-      const { data } = await supabase
-        .from("investors")
-        .select("name, code")
-        .eq("id", investorId)
-        .maybeSingle();
-      if (data) investor = data;
-    }
+    const targetId = profile?.investor_id ?? investorList?.[0]?.id ?? null;
+    const portfolio = portfolios?.find((p) => p.investor_id === targetId) ?? portfolios?.[0];
+    const investorId = portfolio?.investor_id ?? targetId;
+    const investor = investorList?.find((row) => row.id === investorId) ?? null;
 
     const { data: summaries } = await supabase
       .from("asset_summary")
