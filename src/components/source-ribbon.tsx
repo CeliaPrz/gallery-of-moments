@@ -9,7 +9,7 @@ export function SourceRibbonBar({ source }: { source: SourceRibbon | null }) {
     <div className="flex items-center gap-2 rounded-lg bg-surface-container-high/60 px-3 py-2">
       <MaterialIcon name="info" className="shrink-0 text-[16px] text-surface-tint" />
       <p className="font-audit-trail text-[11px] text-secondary">
-        Source : {source.fileName} · v{source.templateVersion} · importé le{" "}
+        Source : {source.fileName} · {source.templateVersion} · importé le{" "}
         {formatDate(source.importedAt)}
       </p>
     </div>

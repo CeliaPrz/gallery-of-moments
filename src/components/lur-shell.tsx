@@ -240,4 +240,3 @@ export function LurShell({
   );
 }
 
-export { navItems };
