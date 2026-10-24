@@ -62,12 +62,12 @@ function AuthPage() {
               className="h-[880px] w-[880px] text-surface-container-lowest"
               fill="none"
               stroke="currentColor"
-              stroke-width="1.2"
+              strokeWidth="1.2"
               viewBox="0 0 600 600"
             >
-              <circle cx="300" cy="300" r="280" stroke-dasharray="4 8" />
+              <circle cx="300" cy="300" r="280" strokeDasharray="4 8" />
               <circle cx="300" cy="300" r="210" />
-              <circle cx="300" cy="300" r="140" stroke-dasharray="2 4" />
+              <circle cx="300" cy="300" r="140" strokeDasharray="2 4" />
               <line x1="20" x2="580" y1="300" y2="300" />
               <line x1="300" x2="300" y1="20" y2="580" />
               <rect height="240" width="240" x="180" y="180" />
