@@ -1,4 +1,4 @@
-import type { SourceRibbon } from "@/server/lur.functions";
+import type { SourceRibbon } from "@/lib/lur.functions";
 import { formatDate } from "@/lib/format";
 import { MaterialIcon } from "@/components/material-icon";
 

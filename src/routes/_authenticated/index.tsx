@@ -11,7 +11,7 @@ import {
   formatSqm,
   monthsSince,
 } from "@/lib/format";
-import { getDashboard, type AssetAlert } from "@/server/lur.functions";
+import { getDashboard, type AssetAlert } from "@/lib/lur.functions";
 
 const dashboardQueryOptions = queryOptions({
   queryKey: ["dashboard"],

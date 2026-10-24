@@ -6,8 +6,8 @@ import { toast } from "sonner";
 import { MaterialIcon } from "@/components/material-icon";
 import { LurShell } from "@/components/lur-shell";
 import { formatDate, formatPercent } from "@/lib/format";
-import { getImportContext, whoami } from "@/server/lur.functions";
-import { recordImport } from "@/server/imports.functions";
+import { getImportContext, whoami } from "@/lib/lur.functions";
+import { recordImport } from "@/lib/imports.functions";
 
 const MAX_BYTES = 50 * 1024 * 1024;
 
