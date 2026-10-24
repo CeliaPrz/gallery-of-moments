@@ -11,7 +11,6 @@ import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-import appSvg from "./assets/eslint.svg";
 import appCss from "./styles.css?url";
 
 function RootComponent() {
@@ -48,7 +47,6 @@ function RootComponent() {
           rel="stylesheet"
           href={appCss}
         />
-        <link rel="icon" href={appSvg} type="image/svg+xml" />
         <title>LUR — Gestion d'actifs immobiliers</title>
         <meta
           name="description"
