@@ -292,10 +292,6 @@ export const getDashboard = createServerFn({ method: "GET" })
       )
       .order("name");
 
-    const scoped = investorId
-      ? summaries?.filter((s) => s.asset_summary_guard !== undefined) ?? summaries
-      : summaries;
-
     const rows = (investorId
       ? summaries?.filter((s) => s.investor_id === investorId)
       : summaries) ?? [];
@@ -605,7 +601,7 @@ export const getImportContext = createServerFn({ method: "GET" })
 
     const { data: imports } = await supabase
       .from("imports")
-      .select("id, file_name, template_version, imported_at, status, notes, imported_by")
+      .select("id, file_name, template_version, imported_at, status, notes, imported_by, investor_id")
       .order("imported_at", { ascending: false });
 
     const { data: profile } = await supabase
