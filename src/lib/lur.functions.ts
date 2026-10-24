@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { buildAlerts, type AssetAlert } from "./alerts";
 
 
 export type SourceRibbon = {
