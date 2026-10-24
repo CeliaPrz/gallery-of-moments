@@ -17,7 +17,8 @@ import {
   formatYield,
   monthsSince,
 } from "@/lib/format";
-import { COVENANT_PROXIMITY_RATIO, getAssetSheet } from "@/lib/lur.functions";
+import { COVENANT_PROXIMITY_RATIO } from "@/lib/alerts";
+import { getAssetSheet } from "@/lib/lur.functions";
 
 const assetQueryOptions = (assetId: string) =>
   queryOptions({
