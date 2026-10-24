@@ -57,7 +57,6 @@ export type DashboardDto = {
   totalAnnualRent: number | null;
   occupancyRate: number | null;
   portfolioLtv: number | null;
-  portfolioLtvCovenant: number | null;
   assetsCount: number | null;
   assets: DashboardAssetRow[];
   alerts: AssetAlert[];
@@ -156,9 +155,6 @@ export type ImportDto = {
   counts: { assets: number; units: number; leases: number; tenants: number; loans: number; bpVersions: number };
 };
 
-function firstName(fullName: string): string {
-  return fullName.trim().split(/\s+/)[0] ?? fullName;
-}
 
 async function loadSource(supabase: any, importId: string | null): Promise<SourceRibbon | null> {
   if (!importId) return null;
@@ -397,7 +393,6 @@ export const getDashboard = createServerFn({ method: "GET" })
       totalAnnualRent: portfolio?.total_annual_rent ?? null,
       occupancyRate: portfolio?.occupancy_rate ?? null,
       portfolioLtv: portfolio?.portfolio_ltv ?? null,
-      portfolioLtvCovenant: null,
       assetsCount: portfolio?.assets_count ?? rows.length,
       assets,
       alerts,
