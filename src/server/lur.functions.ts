@@ -143,7 +143,14 @@ export type ImportDto = {
     notes: string | null;
     importedBy: string | null;
   }[];
-  preview: { assetId: string; name: string; marketValue: number | null; annualRent: number | null }[];
+  preview: {
+    assetId: string;
+    name: string;
+    marketValue: number | null;
+    annualRent: number | null;
+    ltv: number | null;
+    ltvCovenant: number | null;
+  }[];
   counts: { assets: number; units: number; leases: number; tenants: number; loans: number; bpVersions: number };
 };
 
@@ -618,8 +625,15 @@ export const getImportContext = createServerFn({ method: "GET" })
 
     const { data: previews } = await supabase
       .from("asset_summary")
-      .select("asset_id, name, market_value, annual_rent")
+      .select("asset_id, name, market_value, annual_rent, ltv")
       .order("name");
+
+    const { data: covenantRows } = await supabase
+      .from("loans")
+      .select("asset_id, ltv_covenant");
+    const covenantByAsset = new Map(
+      (covenantRows ?? []).map((row) => [row.asset_id as string, row.ltv_covenant]),
+    );
 
     const [units, leases, tenants, loans, bp] = await Promise.all([
       supabase.from("units").select("id", { count: "exact", head: true }),
@@ -655,6 +669,8 @@ export const getImportContext = createServerFn({ method: "GET" })
         name: p.name as string,
         marketValue: p.market_value,
         annualRent: p.annual_rent,
+        ltv: p.ltv,
+        ltvCovenant: covenantByAsset.get(p.asset_id as string) ?? null,
       })),
       counts: {
         assets: (previews ?? []).length,
