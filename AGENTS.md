@@ -8,3 +8,10 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+## Structure
+
+- Server functions live in `src/lib/*.functions.ts`. Never put them in a `src/server/` directory: the client import-protection pattern `**/server/**` denies route and component imports of anything under it, so the app fails to load.
+- Pure business rules (alert thresholds, deduplication, ordering) live in a plain module such as `src/lib/alerts.ts` and are imported by the server functions. Keeping them free of server imports makes them unit-testable with vitest.
+- The signed-in area is gated by the pathless layout `src/routes/_authenticated/route.tsx`, which is client-only and redirects to `/auth`. The dashboard is `/`, the login screen is `/auth`, and there is no public landing page — `src/routes/index.tsx` must not exist, or the route generator fails the build with a duplicate `/`.
+- Design tokens (palette, spacing, type scale, fonts) are defined in `src/styles.css` under `@theme`; components use the generated utilities instead of hardcoded color values. Web fonts are loaded with a `<link>` in `src/routes/__root.tsx`, never with a remote `@import` in the stylesheet.
