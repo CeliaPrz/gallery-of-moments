@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { buildAlerts, buildDashboardAlerts, type AssetAlert, type DashboardAlert } from "./alerts";
+import { buildAlerts, buildDashboardAlerts, nextEventDate, type AssetAlert, type DashboardAlert } from "./alerts";
 
 
 export type SourceRibbon = {
@@ -22,6 +22,7 @@ export type DashboardAssetRow = {
   occupancyRate: number | null;
   ltv: number | null;
   asOfDate: string | null;
+  nextEventDate: string | null;
 };
 
 export type DashboardDto = {
@@ -239,7 +240,7 @@ export const getDashboard = createServerFn({ method: "GET" })
           .in("import_id", imps),
         supabase
           .from("loans")
-          .select("asset_id, import_id, ltv, ltv_covenant")
+          .select("asset_id, import_id, ltv, ltv_covenant, maturity_date")
           .in("asset_id", ids)
           .in("import_id", imps),
         supabase
