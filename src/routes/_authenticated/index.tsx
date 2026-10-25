@@ -302,10 +302,11 @@ function DashboardPage() {
                     "Ville",
                     "Surface",
                     "Valeur",
-                    "Loyer annuel",
                     "Occupation",
                     "LTV",
-                    "Données au",
+                    "Prochaine échéance",
+                    "Dernière mise à jour",
+                    "Accès",
                   ].map((heading) => (
                     <th
                       key={heading}
@@ -321,7 +322,7 @@ function DashboardPage() {
                   <tr
                     key={asset.assetId}
                     onClick={() => navigate({ to: "/actifs/$assetId", params: { assetId: asset.assetId } })}
-                    className="cursor-pointer border-b border-outline-variant/40 tabular-nums last:border-0 hover:bg-surface-container-low"
+                    className="group cursor-pointer border-b border-outline-variant/40 tabular-nums last:border-0 hover:bg-surface-container-low"
                   >
                     <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
                       {asset.name}
@@ -336,16 +337,22 @@ function DashboardPage() {
                       {formatMillions(asset.marketValue, 1)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
-                      {formatMillions(asset.annualRent, 2)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
                       {formatPercent(asset.occupancyRate, 1)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
                       {formatPercent(asset.ltv, 1)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-body-sm text-secondary">
+                      {formatDate(asset.nextEventDate)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 font-body-sm text-secondary">
                       {formatDate(asset.asOfDate)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right">
+                      <MaterialIcon
+                        name="arrow_forward"
+                        className="text-[20px] text-outline transition-all group-hover:translate-x-1 group-hover:text-primary"
+                      />
                     </td>
                   </tr>
                 ))}

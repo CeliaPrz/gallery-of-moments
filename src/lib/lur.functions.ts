@@ -322,6 +322,7 @@ export const getDashboard = createServerFn({ method: "GET" })
         occupancyRate: row.occupancy_rate,
         ltv: row.ltv,
         asOfDate: row.as_of_date,
+        nextEventDate: nextEventDate(eventDates.get(row.asset_id as string) ?? []),
       })),
       alerts,
       lastReport: report
