@@ -63,6 +63,9 @@
 /* LUR design tokens — values taken verbatim from the design HTML. */
 @theme {
   --color-primary: #183123;
+  --color-alert-amber: #b7791f;
+  --color-forest: #2e4738;
+  --color-brick: #a23b2a;
   --color-primary-container: #2e4738;
   --color-on-primary: #ffffff;
   --color-on-primary-container: #99b5a1;
