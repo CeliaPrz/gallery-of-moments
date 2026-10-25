@@ -1,15 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { buildAlerts, buildDashboardAlerts, nextEventDate, type AssetAlert, type DashboardAlert } from "./alerts";
-
-
-export type SourceRibbon = {
-  fileName: string;
-  templateVersion: string;
-  importedAt: string | null;
-  asOfDate: string | null;
-};
+import { buildDashboardAlerts, nextEventDate, type DashboardAlert } from "./alerts";
+import { assembleAssetSheet, storageUrlForBrowser, type AssetSheetDto } from "./asset-sheet";
+export type { AssetSheetDto, LeaseRowDto, SourceRibbon } from "./asset-sheet";
 
 
 export type DashboardAssetRow = {
@@ -45,71 +39,6 @@ export type DashboardDto = {
   lastImportAt: string | null;
 };
 
-export type LeaseRowDto = {
-  lot: string;
-  floor: string | null;
-  tenantName: string | null;
-  isVacant: boolean;
-  areaSqm: number | null;
-  annualRent: number | null;
-  endDate: string | null;
-  breakDate: string | null;
-  indexation: string | null;
-  vacantSince: string | null;
-};
-
-export type AssetSheetDto = {
-  fullName: string;
-  isAdmin: boolean;
-  asset: {
-    id: string;
-    name: string;
-    code: string;
-    assetType: string;
-    address: string;
-    city: string;
-    areaSqm: number;
-    acquisitionDate: string | null;
-    strategy: string | null;
-  };
-  investor: { name: string; code: string };
-  summary: {
-    marketValue: number | null;
-    valuationDate: string | null;
-    annualRent: number | null;
-    occupancyRate: number | null;
-    vacantAreaSqm: number | null;
-    ltv: number | null;
-    totalDebt: number | null;
-    asOfDate: string | null;
-  };
-  loan: {
-    lender: string;
-    outstanding: number;
-    maturityDate: string | null;
-    ltv: number | null;
-    ltvCovenant: number | null;
-    icr: number | null;
-    icrCovenant: number | null;
-    amortizationType: string | null;
-    interestRate: number | null;
-    rateType: string | null;
-    referenceIndex: string | null;
-  } | null;
-  leases: LeaseRowDto[];
-  counts: { activeTenants: number; vacantLots: number };
-  bp: {
-    versionLabel: string;
-    versionDate: string;
-    comment: string | null;
-    initialYield: number | null;
-    targetIrr: number | null;
-    previousCount: number;
-  } | null;
-  alerts: AssetAlert[];
-  source: SourceRibbon | null;
-};
-
 export type ImportDto = {
   investors: { id: string; code: string; name: string; assetsCount: number }[];
   selectedInvestorId: string | null;
@@ -134,23 +63,6 @@ export type ImportDto = {
   }[];
   counts: { assets: number; units: number; leases: number; tenants: number; loans: number; bpVersions: number };
 };
-
-
-async function loadSource(supabase: any, importId: string | null): Promise<SourceRibbon | null> {
-  if (!importId) return null;
-  const { data } = await supabase
-    .from("imports")
-    .select("file_name, template_version, imported_at, as_of_date")
-    .eq("id", importId)
-    .maybeSingle();
-  if (!data) return null;
-  return {
-    fileName: data.file_name,
-    templateVersion: data.template_version,
-    importedAt: data.imported_at,
-    asOfDate: data.as_of_date,
-  };
-}
 
 
 export const whoami = createServerFn({ method: "GET" })
@@ -337,178 +249,84 @@ export const getAssetSheet = createServerFn({ method: "GET" })
   .inputValidator((assetId: string) => assetId)
   .handler(async ({ context, data: assetId }): Promise<AssetSheetDto> => {
     const supabase = context.supabase;
+    const { data: asset, error: assetError } = await supabase.from("assets")
+      .select("id, name, code, asset_type, address, city, lettable_area_sqm, acquisition_date, strategy, investor_id, units_count, parking_spaces, year_built, year_renovated, cadastral_reference, description, photo_path, postal_code, created_at, updated_at")
+      .eq("id", assetId).maybeSingle();
+    if (assetError || !asset) throw new Error("Cet actif n'est pas disponible.");
 
-    const { data: asset } = await supabase
-      .from("assets")
-      .select(
-        "id, name, code, asset_type, address, city, lettable_area_sqm, acquisition_date, strategy, investor_id",
-      )
-      .eq("id", assetId)
-      .maybeSingle();
-
-    if (!asset) throw new Error("Actif introuvable ou non autorisé.");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("full_name, role")
-      .eq("id", context.userId)
-      .maybeSingle();
-
-    const { data: summary } = await supabase
-      .from("asset_summary")
-      .select(
-        "market_value, valuation_date, annual_rent, occupancy_rate, vacant_area_sqm, ltv, total_debt, as_of_date, import_id",
-      )
-      .eq("asset_id", assetId)
-      .maybeSingle();
-
-    const { data: investor } = await supabase
-      .from("investors")
-      .select("name, code")
-      .eq("id", asset.investor_id)
-      .maybeSingle();
-
-    const { data: loan } = await supabase
-      .from("loans")
-      .select(
-        "lender, outstanding, maturity_date, ltv, ltv_covenant, icr, icr_covenant, amortization_type, interest_rate, rate_type, reference_index",
-      )
-      .eq("asset_id", assetId)
-      .maybeSingle();
-
-    const { data: leaseRows } = await supabase
-      .from("leases")
-      .select(
-        "annual_rent, end_date, break_date, indexation, area_sqm, is_active, unit:units(label, floor), tenant:tenants(name)",
-      )
-      .eq("asset_id", assetId)
-      .eq("is_active", true);
-
-    const { data: vacantUnits } = await supabase
-      .from("units")
-      .select("label, floor, area_sqm, vacant_since")
-      .eq("asset_id", assetId)
-      .not("vacant_since", "is", null);
-
-    const { data: bpCurrent } = await supabase
-      .from("bp_versions")
-      .select("version_label, version_date, comment, initial_yield, target_irr")
-      .eq("asset_id", assetId)
-      .eq("is_current", true)
-      .maybeSingle();
-
-    const { count: previousCount } = await supabase
-      .from("bp_versions")
-      .select("id", { count: "exact", head: true })
-      .eq("asset_id", assetId)
-      .eq("is_current", false);
-
-    const leases: LeaseRowDto[] = (leaseRows ?? []).map((row: any) => ({
-      lot: row.unit?.label ?? "",
-      floor: row.unit?.floor ?? null,
-      tenantName: row.tenant?.name ?? null,
-      isVacant: false,
-      areaSqm: row.area_sqm ?? row.unit?.area_sqm ?? null,
-      annualRent: row.annual_rent,
-      endDate: row.end_date,
-      breakDate: row.break_date,
-      indexation: row.indexation,
-      vacantSince: null,
-    }));
-
-    for (const unit of vacantUnits ?? []) {
-      leases.push({
-        lot: unit.label,
-        floor: unit.floor,
-        tenantName: null,
-        isVacant: true,
-        areaSqm: unit.area_sqm,
-        annualRent: null,
-        endDate: null,
-        breakDate: null,
-        indexation: null,
-        vacantSince: unit.vacant_since,
-      });
+    const [profileResult, summaryResult, investorResult, unitResult, documentResult] = await Promise.all([
+      supabase.from("profiles").select("full_name, role").eq("id", context.userId).maybeSingle(),
+      supabase.from("asset_summary").select("*").eq("asset_id", assetId).maybeSingle(),
+      supabase.from("investors").select("name, code").eq("id", asset.investor_id).maybeSingle(),
+      supabase.from("units").select("*").eq("asset_id", assetId).order("label"),
+      supabase.from("documents").select("id, name, doc_type, uploaded_at").eq("asset_id", assetId)
+        .order("uploaded_at", { ascending: false }),
+    ]);
+    if ([profileResult, summaryResult, investorResult, unitResult, documentResult].some((r) => r.error)) {
+      throw new Error("Les données de cet actif ne sont pas disponibles pour le moment.");
     }
-
-    const alerts = buildAlerts(
-      [{ assetId, name: asset.name }],
-      loan ? [{ asset_id: assetId, ltv: loan.ltv, ltv_covenant: loan.ltv_covenant }] : [],
-      (leaseRows ?? [])
-        .filter((row: any) => row.end_date && row.tenant?.name)
-        .map((row: any) => ({
-          asset_id: assetId,
-          tenant_name: row.tenant.name as string,
-          end_date: row.end_date as string,
-        })),
-      (vacantUnits ?? [])
-        .filter((u) => u.vacant_since)
-        .map((u) => ({
-          asset_id: assetId,
-          area_sqm: Number(u.area_sqm),
-          floor: u.floor,
-          vacant_since: u.vacant_since as string,
-        })),
-    );
-
+    const importId = summaryResult.data?.import_id ?? null;
+    const importResult = importId
+      ? await supabase.from("imports").select("*").eq("id", importId).eq("status", "valide").maybeSingle()
+      : { data: null, error: null };
+    if (importResult.error) throw new Error("Les données de cet actif ne sont pas disponibles pour le moment.");
+    const hasData = Boolean(importId && importResult.data);
+    // Even for admins, never read historical leases, loans, or BP versions into the sheet.
+    const scopedImportId = hasData && importId ? importId : NO_ID;
+    const [leaseResult, loanResult, bpResult] = hasData ? await Promise.all([
+      supabase.from("leases").select("*, tenant:tenants(name)").eq("asset_id", assetId)
+        .eq("import_id", scopedImportId).eq("is_active", true).order("start_date", { ascending: false, nullsFirst: false }).order("id"),
+      supabase.from("loans")
+        .select("id, asset_id, import_id, lender, maturity_date, ltv, ltv_covenant, icr, icr_covenant, amortization_type, interest_rate, rate_type, reference_index")
+        .eq("asset_id", assetId).eq("import_id", scopedImportId).order("lender").order("id"),
+      supabase.from("bp_versions").select("*").eq("asset_id", assetId).eq("import_id", scopedImportId)
+        .order("version_date", { ascending: false }).order("id"),
+    ]) : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
+    if ([leaseResult, loanResult, bpResult].some((r) => r.error)) {
+      throw new Error("Les données de cet actif ne sont pas disponibles pour le moment.");
+    }
+    const assembled = assembleAssetSheet({
+      asset, summary: summaryResult.data, currentImport: importResult.data,
+      units: unitResult.data ?? [], leases: leaseResult.data ?? [], loans: loanResult.data ?? [],
+      bpVersions: bpResult.data ?? [],
+    });
+    let photoUrl: string | null = null;
+    if (asset.photo_path) {
+      const { data: photo } = await supabase.storage.from("asset-photos").createSignedUrl(asset.photo_path, 3600);
+      if (photo?.signedUrl) photoUrl = storageUrlForBrowser(
+        photo.signedUrl, process.env["SUPABASE_URL"], import.meta.env['VITE_SUPABASE_URL'],
+      );
+    }
     return {
-      fullName: profile?.full_name ?? "",
-      isAdmin: profile?.role === "admin",
+      ...assembled,
+      fullName: profileResult.data?.full_name ?? "", isAdmin: profileResult.data?.role === "admin",
       asset: {
-        id: asset.id,
-        name: asset.name,
-        code: asset.code,
-        assetType: asset.asset_type,
-        address: asset.address,
-        city: asset.city,
-        areaSqm: asset.lettable_area_sqm,
-        acquisitionDate: asset.acquisition_date,
-        strategy: asset.strategy,
+        id: asset.id, name: asset.name, code: asset.code, assetType: asset.asset_type,
+        address: asset.address, city: asset.city, areaSqm: asset.lettable_area_sqm,
+        acquisitionDate: asset.acquisition_date, strategy: asset.strategy, unitsCount: asset.units_count,
+        parkingSpaces: asset.parking_spaces, yearBuilt: asset.year_built, yearRenovated: asset.year_renovated,
+        cadastralReference: asset.cadastral_reference, description: asset.description,
       },
-      investor: { name: investor?.name ?? "", code: investor?.code ?? "" },
-      summary: {
-        marketValue: summary?.market_value ?? null,
-        valuationDate: summary?.valuation_date ?? null,
-        annualRent: summary?.annual_rent ?? null,
-        occupancyRate: summary?.occupancy_rate ?? null,
-        vacantAreaSqm: summary?.vacant_area_sqm ?? null,
-        ltv: summary?.ltv ?? null,
-        totalDebt: summary?.total_debt ?? null,
-        asOfDate: summary?.as_of_date ?? null,
-      },
-      loan: loan
-        ? {
-            lender: loan.lender,
-            outstanding: Number(loan.outstanding),
-            maturityDate: loan.maturity_date,
-            ltv: loan.ltv,
-            ltvCovenant: loan.ltv_covenant,
-            icr: loan.icr,
-            icrCovenant: loan.icr_covenant,
-            amortizationType: loan.amortization_type,
-            interestRate: loan.interest_rate,
-            rateType: loan.rate_type,
-            referenceIndex: loan.reference_index,
-          }
-        : null,
-      leases,
-      counts: {
-        activeTenants: (leaseRows ?? []).length,
-        vacantLots: (vacantUnits ?? []).length,
-      },
-      bp: bpCurrent
-        ? {
-            versionLabel: bpCurrent.version_label,
-            versionDate: bpCurrent.version_date,
-            comment: bpCurrent.comment,
-            initialYield: bpCurrent.initial_yield,
-            targetIrr: bpCurrent.target_irr,
-            previousCount: previousCount ?? 0,
-          }
-        : null,
-      alerts,
-      source: await loadSource(supabase, summary?.import_id ?? null),
+      investor: { name: investorResult.data?.name ?? "", code: investorResult.data?.code ?? "" },
+      photoUrl,
+      documents: (documentResult.data ?? []).map((d) => ({ id: d.id, name: d.name, docType: d.doc_type, uploadedAt: d.uploaded_at })),
     };
+  });
+
+export const getDocumentDownload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { assetId: string; documentId: string }) => {
+    if (!input.assetId || !input.documentId) throw new Error("Ce document n'est pas disponible.");
+    return input;
+  })
+  .handler(async ({ context, data }) => {
+    const { data: document, error } = await context.supabase.from("documents")
+      .select("file_path, name").eq("id", data.documentId).eq("asset_id", data.assetId).maybeSingle();
+    if (error || !document) throw new Error("Ce document n'est pas disponible.");
+    const { data: signed, error: signingError } = await context.supabase.storage.from("documents")
+      .createSignedUrl(document.file_path, 60, { download: document.name });
+    if (signingError || !signed?.signedUrl) throw new Error("Ce document n'est pas disponible.");
+    return { url: storageUrlForBrowser(signed.signedUrl, process.env["SUPABASE_URL"], import.meta.env['VITE_SUPABASE_URL']) };
   });
 
 export const getImportContext = createServerFn({ method: "GET" })
