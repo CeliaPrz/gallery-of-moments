@@ -20,7 +20,7 @@ const dashboardQueryOptions = (investorId: string | null) =>
 
 export const Route = createFileRoute("/_authenticated/")({
   validateSearch: (search: Record<string, unknown>): { investisseur?: string } =>
-    typeof search.investisseur === "string" ? { investisseur: search.investisseur } : {},
+    typeof search["investisseur"] === "string" ? { investisseur: search["investisseur"] } : {},
   loaderDeps: ({ search }) => ({ investorId: search.investisseur ?? null }),
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(dashboardQueryOptions(deps.investorId)),
@@ -157,7 +157,7 @@ function DashboardPage() {
               aria-label="Investisseur"
               value={data.selectedInvestorId ?? ""}
               onChange={(e) =>
-                navigate({ to: "/", search: { investisseur: e.target.value || undefined } })
+                navigate({ to: "/", search: e.target.value ? { investisseur: e.target.value } : {} })
               }
               className="rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 font-body-sm text-on-surface"
             >
