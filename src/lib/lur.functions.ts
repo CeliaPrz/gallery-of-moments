@@ -270,6 +270,25 @@ export const getDashboard = createServerFn({ method: "GET" })
       units ?? [],
     );
 
+    // « Prochaine échéance » : la date à venir la plus proche parmi les baux actifs
+    // (fin, option de sortie) et l'échéance du prêt de l'import en vigueur.
+    const isCurrentRow = (assetId: string, importId: string) =>
+      rows.some((r) => r.asset_id === assetId && r.import_id === importId);
+    const eventDates = new Map<string, string[]>();
+    const pushDate = (assetId: string, value: string | null) => {
+      if (!value) return;
+      eventDates.set(assetId, [...(eventDates.get(assetId) ?? []), value]);
+    };
+    for (const lease of leases ?? []) {
+      if (!lease.is_active || !isCurrentRow(lease.asset_id, lease.import_id)) continue;
+      pushDate(lease.asset_id, lease.end_date);
+      pushDate(lease.asset_id, lease.break_date);
+    }
+    for (const loan of loans ?? []) {
+      if (!isCurrentRow(loan.asset_id, loan.import_id)) continue;
+      pushDate(loan.asset_id, loan.maturity_date);
+    }
+
     let reportQuery = supabase
       .from("reports")
       .select("period_label, validated_at, pdf_path")
