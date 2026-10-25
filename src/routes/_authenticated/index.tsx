@@ -1,26 +1,30 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 
 import { MaterialIcon } from "@/components/material-icon";
 import { LurShell } from "@/components/lur-shell";
-import { SourceRibbonBar } from "@/components/source-ribbon";
 import {
   formatDate,
   formatMillions,
   formatPercent,
   formatSqm,
-  monthsSince,
 } from "@/lib/format";
-import type { AssetAlert } from "@/lib/alerts";
+import type { DashboardAlert } from "@/lib/alerts";
 import { getDashboard } from "@/lib/lur.functions";
 
-const dashboardQueryOptions = queryOptions({
-  queryKey: ["dashboard"],
-  queryFn: () => getDashboard(),
-});
+const dashboardQueryOptions = (investorId: string | null) =>
+  queryOptions({
+    queryKey: ["dashboard", investorId],
+    queryFn: () => getDashboard({ data: { investorId } }),
+  });
 
 export const Route = createFileRoute("/_authenticated/")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(dashboardQueryOptions),
+  validateSearch: (search: Record<string, unknown>): { investisseur?: string } =>
+    typeof search["investisseur"] === "string" ? { investisseur: search["investisseur"] } : {},
+  loaderDeps: ({ search }) => ({ investorId: search.investisseur ?? null }),
+  loader: ({ context, deps }) =>
+    context.queryClient.ensureQueryData(dashboardQueryOptions(deps.investorId)),
+  pendingComponent: DashboardSkeleton,
   head: () => ({
     meta: [
       { title: "Tableau de bord — LUR Gestion d'actifs" },
@@ -41,7 +45,7 @@ export const Route = createFileRoute("/_authenticated/")({
   }),
   component: DashboardPage,
   errorComponent: ({ error }) => (
-    <div role="alert" className="p-8 font-body-md text-error">
+    <div role="alert" className="p-8 font-body-md text-brick">
       {error instanceof Error ? error.message : String(error)}
     </div>
   ),
@@ -50,29 +54,46 @@ export const Route = createFileRoute("/_authenticated/")({
   ),
 });
 
-function alertIcon(kind: AssetAlert["kind"]): string {
-  if (kind === "covenant") return "warning";
-  if (kind === "echeance") return "event_repeat";
+function alertIcon(kind: DashboardAlert["kind"]): string {
+  if (kind === "financement") return "warning";
+  if (kind === "bail") return "event_repeat";
   return "domain_disabled";
 }
 
-function alertKindLabel(kind: AssetAlert["kind"]): string {
-  if (kind === "covenant") return "Covenant";
-  if (kind === "echeance") return "Échéance";
+function alertKindLabel(kind: DashboardAlert["kind"]): string {
+  if (kind === "financement") return "Financement";
+  if (kind === "bail") return "Bail";
   return "Vacance";
 }
 
-function alertMessage(alert: AssetAlert): string {
-  if (alert.kind === "covenant") {
-    return `LTV à ${formatPercent(alert.ltv)}, covenant à ${formatPercent(alert.covenant)}`;
+function alertMessage(alert: DashboardAlert): string {
+  if (alert.kind === "bail") {
+    return `Bail ${alert.tenantName} (${alert.assetName}) : ${
+      alert.event === "echeance" ? "échéance" : "option de sortie"
+    } le ${formatDate(alert.date)}`;
   }
-  if (alert.kind === "echeance") {
-    return `bail ${alert.tenantName} à échéance le ${formatDate(alert.endDate)}`;
+  if (alert.kind === "financement") {
+    return `LTV ${alert.assetName} : ${formatPercent(alert.ltv, 1)} pour un covenant à ${formatPercent(alert.covenant, 1)}`;
   }
-  const months = monthsSince(alert.vacantSince);
-  return `${formatSqm(alert.areaSqm)} vacants au ${alert.floorLabel}${
-    months != null ? ` depuis ${months} mois` : ""
-  }`;
+  return `Lot ${alert.label} (${alert.assetName}) vacant depuis ${alert.months} mois`;
+}
+
+function DashboardSkeleton() {
+  return (
+    <main className="mx-auto max-w-[1200px] space-y-6 p-6 lg:p-8" aria-busy="true">
+      <div className="h-9 w-64 animate-pulse rounded-lg bg-surface-container-high" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-28 animate-pulse rounded-xl bg-surface-container-high" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="h-56 animate-pulse rounded-xl bg-surface-container-high" />
+        <div className="h-56 animate-pulse rounded-xl bg-surface-container-high" />
+      </div>
+      <div className="h-72 animate-pulse rounded-xl bg-surface-container-high" />
+    </main>
+  );
 }
 
 function reportTitle(periodLabel: string): string {
@@ -90,15 +111,18 @@ function KpiCard({ label, icon, value }: { label: string; icon: string; value: s
         <p className="font-label-md text-[11px] uppercase tracking-wider text-secondary">{label}</p>
         <MaterialIcon name={icon} className="shrink-0 text-[20px] text-surface-tint" />
       </div>
-      <p className="mt-3 font-kpi-metric text-kpi-metric text-primary">{value}</p>
+      <p className="mt-3 font-kpi-metric text-kpi-metric tabular-nums text-primary">{value}</p>
+      <p className="mt-2 font-audit-trail text-[11px] text-secondary">Source : imports Excel validés</p>
     </div>
   );
 }
 
 function DashboardPage() {
-  const { data } = useSuspenseQuery(dashboardQueryOptions);
-  const firstName = data.fullName.trim().split(/\s+/)[0] ?? data.fullName;
-  const maxRent = Math.max(...data.rentBars.map((bar) => bar.rent), 1);
+  const { investorId } = Route.useLoaderDeps();
+  const { data } = useSuspenseQuery(dashboardQueryOptions(investorId));
+  const navigate = useNavigate();
+  const rentBars = data.assets.filter((a) => a.annualRent != null);
+  const maxRent = Math.max(...rentBars.map((bar) => Number(bar.annualRent)), 1);
 
   return (
     <LurShell
@@ -106,7 +130,7 @@ function DashboardPage() {
       fullName={data.fullName}
       investorName={data.investorName}
       assetsCount={data.assetsCount}
-      lastImportLabel={data.source ? formatDate(data.source.importedAt) : null}
+      lastImportLabel={data.lastImportAt ? formatDate(data.lastImportAt) : null}
     >
       <header className="flex items-center justify-end gap-1 border-b border-outline-variant/40 bg-surface px-6 py-3">
         <button
@@ -127,37 +151,62 @@ function DashboardPage() {
 
       <main className="mx-auto max-w-[1200px] space-y-6 p-6 lg:p-8">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="font-display-md text-display-md text-on-surface">Bonjour {firstName}</h1>
-          <p className="font-body-sm text-secondary">
-            Données à jour au {formatDate(data.latestDataDate)}
-          </p>
+          <h1 className="font-display-md text-display-md text-on-surface">Tableau de bord</h1>
+          {data.isAdmin && (
+            <select
+              aria-label="Investisseur"
+              value={data.selectedInvestorId ?? ""}
+              onChange={(e) =>
+                navigate({ to: "/", search: e.target.value ? { investisseur: e.target.value } : {} })
+              }
+              className="rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 font-body-sm text-on-surface"
+            >
+              {data.investors.map((inv) => (
+                <option key={inv.id} value={inv.id}>
+                  {inv.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {data.hasData && (
+            <p className="w-full font-body-sm tabular-nums text-secondary">
+              Données au {formatDate(data.latestDataDate)}
+              {data.oldestDataDate && data.oldestDataDate !== data.latestDataDate
+                ? ` (certains actifs au ${formatDate(data.oldestDataDate)})`
+                : ""}
+            </p>
+          )}
         </div>
+
+        {!data.hasData ? (
+          <p className="font-body-md text-secondary">Aucune donnée importée pour le moment.</p>
+        ) : (
+        <>
 
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
             label="Valeur du portefeuille"
             icon="account_balance"
-            value={formatMillions(data.totalValue)}
+            value={formatMillions(data.totalValue, 1)}
           />
           <KpiCard
             label="Loyers annuels"
             icon="payments"
-            value={formatMillions(data.totalAnnualRent)}
+            value={formatMillions(data.totalAnnualRent, 2)}
           />
           <KpiCard
             label="Taux d'occupation"
             icon="domain_verification"
-            value={formatPercent(data.occupancyRate)}
+            value={formatPercent(data.occupancyRate, 1)}
           />
           <KpiCard
             label="LTV du portefeuille"
             icon="pie_chart"
-            value={formatPercent(data.portfolioLtv)}
+            value={formatPercent(data.portfolioLtv, 1)}
           />
         </section>
 
-        <SourceRibbonBar source={data.source} />
-
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -180,14 +229,14 @@ function DashboardPage() {
                 >
                   <MaterialIcon
                     name={alertIcon(alert.kind)}
-                    className="mt-0.5 shrink-0 text-[20px] text-error"
+                    className="mt-0.5 shrink-0 text-[20px] text-alert-amber"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-body-md text-[13px] font-semibold text-on-surface">
                         {alert.assetName}
                       </p>
-                      <span className="rounded-full bg-error-container px-2 py-0.5 font-label-sm text-[10px] uppercase tracking-wider text-on-error-container">
+                      <span className="rounded-full bg-alert-amber px-2 py-0.5 font-label-sm text-[10px] uppercase tracking-wider text-on-primary">
                         {alertKindLabel(alert.kind)}
                       </span>
                     </div>
@@ -210,27 +259,28 @@ function DashboardPage() {
               </h2>
             </div>
             <p className="font-body-sm text-secondary">
-              Total : {formatMillions(data.totalAnnualRent)}
+              Total : {formatMillions(data.totalAnnualRent, 2)}
             </p>
           </div>
 
           <div className="space-y-3">
-            {data.rentBars.map((bar) => (
+            {rentBars.map((bar) => (
               <div key={bar.assetId} className="flex items-center gap-3">
                 <span className="w-40 shrink-0 truncate font-body-sm text-secondary">{bar.name}</span>
                 <div className="h-2 flex-1 rounded-full bg-surface-container-high">
                   <div
-                    className="h-2 rounded-full bg-primary"
-                    style={{ width: `${Math.max((bar.rent / maxRent) * 100, 2)}%` }}
+                    className="h-2 rounded-full bg-forest"
+                    style={{ width: `${Math.max((Number(bar.annualRent) / maxRent) * 100, 2)}%` }}
                   />
                 </div>
-                <span className="w-20 shrink-0 text-right font-table-data text-table-data text-on-surface">
-                  {formatMillions(bar.rent)}
+                <span className="w-20 shrink-0 text-right font-table-data text-table-data tabular-nums text-on-surface">
+                  {formatMillions(bar.annualRent, 2)}
                 </span>
               </div>
             ))}
           </div>
         </section>
+        </div>
 
         <section id="actifs" className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-sm">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -239,7 +289,7 @@ function DashboardPage() {
               <h2 className="font-headline-sm text-headline-sm text-on-surface">Mes actifs</h2>
             </div>
             <p className="font-body-sm text-secondary">
-              {data.assetsCount} Immeubles tertiaires
+              {data.assetsCount ?? data.assets.length} actifs
             </p>
           </div>
 
@@ -252,11 +302,10 @@ function DashboardPage() {
                     "Ville",
                     "Surface",
                     "Valeur",
+                    "Loyer annuel",
                     "Occupation",
                     "LTV",
-                    "Prochaine échéance",
-                    "Dernière mise à jour",
-                    "Accès",
+                    "Données au",
                   ].map((heading) => (
                     <th
                       key={heading}
@@ -271,47 +320,32 @@ function DashboardPage() {
                 {data.assets.map((asset) => (
                   <tr
                     key={asset.assetId}
-                    className="border-b border-outline-variant/40 last:border-0 hover:bg-surface-container-low"
+                    onClick={() => navigate({ to: "/actifs/$assetId", params: { assetId: asset.assetId } })}
+                    className="cursor-pointer border-b border-outline-variant/40 tabular-nums last:border-0 hover:bg-surface-container-low"
                   >
                     <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
                       {asset.name}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-body-sm text-secondary">
-                      {asset.city}
+                      {asset.city ?? "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
                       {formatSqm(asset.areaSqm)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
-                      {formatMillions(asset.marketValue)}
+                      {formatMillions(asset.marketValue, 1)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
-                      {formatPercent(asset.occupancyRate)}
-                    </td>
-                    <td
-                      className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface"
-                      title={
-                        asset.ltvCovenant != null
-                          ? `Seuil de covenant : ${formatPercent(asset.ltvCovenant)}`
-                          : undefined
-                      }
-                    >
-                      {formatPercent(asset.ltv)}
+                      {formatMillions(asset.annualRent, 2)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
-                      {formatDate(asset.nextExpiry)}
+                      {formatPercent(asset.occupancyRate, 1)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
+                      {formatPercent(asset.ltv, 1)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-body-sm text-secondary">
-                      {formatDate(asset.updatedAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3">
-                      <a
-                        href={`/actifs/${asset.assetId}`}
-                        aria-label={`Ouvrir ${asset.name}`}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-primary hover:bg-surface-container-high"
-                      >
-                        <MaterialIcon name="arrow_forward" className="text-[18px]" />
-                      </a>
+                      {formatDate(asset.asOfDate)}
                     </td>
                   </tr>
                 ))}
@@ -352,6 +386,8 @@ function DashboardPage() {
             </a>
           </div>
         </section>
+        </>
+        )}
       </main>
     </LurShell>
   );
