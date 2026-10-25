@@ -83,9 +83,10 @@ describe("fiche actif : import en vigueur", () => {
     input.loans.push({ ...required(input.loans, 0), id: "loan2" }, { ...required(input.loans, 0), id: "old", import_id: "old" });
     expect(assembleAssetSheet(input, NOW).loans.map((l) => l.id)).toEqual(["loan1", "loan2"]);
   });
-  it("ne transmet pas l'encours de dette à l'interface", () => {
+  it("transmet l'encours de chaque prêt sans jamais l'agréger au niveau du portefeuille", () => {
     const result = assembleAssetSheet(fixture(), NOW);
-    expect(result.loans[0]).not.toHaveProperty("outstanding");
+    expect(required(result.loans, 0)).toHaveProperty("outstanding", 625000);
+    expect(result).not.toHaveProperty("totalOutstanding");
     expect(result.summary).not.toHaveProperty("totalDebt");
   });
   it("utilise la zone ambre à covenant moins 5 points, sans division par zéro", () => {

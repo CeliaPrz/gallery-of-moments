@@ -408,6 +408,8 @@ function AssetSheetPage() {
                 <div><dt className="font-label-md text-[11px] uppercase tracking-wider text-secondary">Taux</dt>
                   <dd className="mt-2 font-kpi-metric-sm text-kpi-metric-sm">{formatYield(loan.interestRate)}</dd>
                   <dd className="mt-1 font-body-sm text-secondary">{loan.rateType || "—"}{loan.rateType && /variable/i.test(loan.rateType) && loan.referenceIndex ? ` · ${loan.referenceIndex}` : ""}</dd></div>
+                <div><dt className="font-label-md text-[11px] uppercase tracking-wider text-secondary">Encours</dt>
+                  <dd className="mt-2 font-kpi-metric-sm text-kpi-metric-sm">{formatMillions(loan.outstanding, 1)}</dd></div>
                 <div><dt className="font-label-md text-[11px] uppercase tracking-wider text-secondary">Type d'amortissement</dt>
                   <dd className="mt-2 break-words font-body-md">{loan.amortizationType || "—"}</dd></div>
                 <div><dt className="font-label-md text-[11px] uppercase tracking-wider text-secondary">ICR</dt>

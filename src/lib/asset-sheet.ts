@@ -32,7 +32,8 @@ export type LeaseRowDto = {
 
 export type LoanInput = Pick<Tables<"loans">,
   "id" | "asset_id" | "import_id" | "lender" | "maturity_date" | "ltv" | "ltv_covenant" |
-  "icr" | "icr_covenant" | "interest_rate" | "rate_type" | "reference_index" | "amortization_type"
+  "icr" | "icr_covenant" | "interest_rate" | "rate_type" | "reference_index" | "amortization_type" |
+  "outstanding"
 >;
 export type LoanDto = {
   id: string;
@@ -46,6 +47,7 @@ export type LoanDto = {
   rateType: string | null;
   referenceIndex: string | null;
   amortizationType: string | null;
+  outstanding: number | null;
   covenantNear: boolean;
   ltvProgress: number | null;
   amberZoneStart: number | null;
@@ -127,7 +129,7 @@ export function assembleAssetSheet(input: AssetSheetInput, now = new Date()) {
   const loans: LoanDto[] = currentLoans.map((l) => ({
     id: l.id, lender: l.lender, maturityDate: l.maturity_date, ltv: l.ltv, ltvCovenant: l.ltv_covenant,
     icr: l.icr, icrCovenant: l.icr_covenant, interestRate: l.interest_rate, rateType: l.rate_type,
-    referenceIndex: l.reference_index, amortizationType: l.amortization_type,
+    referenceIndex: l.reference_index, amortizationType: l.amortization_type, outstanding: l.outstanding ?? null,
     covenantNear: l.ltv != null && l.ltv_covenant != null && l.ltv >= l.ltv_covenant - COVENANT_MARGIN_POINTS,
     ltvProgress: l.ltv != null && l.ltv_covenant != null && l.ltv_covenant > 0
       ? Math.max(0, Math.min(100, l.ltv / l.ltv_covenant * 100)) : null,
