@@ -129,13 +129,13 @@ export function LurShell({
         <button
           type="button"
           aria-label="Fermer le menu"
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={() => setOpen(false)}
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col bg-sidebar text-sidebar-foreground transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col bg-sidebar text-sidebar-foreground transition-transform md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
