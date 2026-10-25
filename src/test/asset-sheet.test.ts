@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { assembleAssetSheet, storageUrlForBrowser, type AssetSheetInput } from "@/lib/asset-sheet";
 import { buildDashboardAlerts } from "@/lib/alerts";
 
+function required<T>(values: T[], index: number): T {
+  const value = values[index];
+  if (value === undefined) throw new Error(`Missing fixture at ${index}`);
+  return value;
+}
+
 const NOW = new Date("2026-10-25T12:00:00");
 const fixture = (): AssetSheetInput => ({
   asset: {
@@ -49,8 +55,8 @@ const fixture = (): AssetSheetInput => ({
 describe("fiche actif : import en vigueur", () => {
   it("ne retient que les baux actifs de l'import en vigueur", () => {
     const input = fixture();
-    input.leases.unshift({ ...input.leases[0], id: "historical", import_id: "old", annual_rent: 1 });
-    input.leases.unshift({ ...input.leases[1], id: "inactive", is_active: false, unit_id: "u2" });
+    input.leases.unshift({ ...required(input.leases, 0), id: "historical", import_id: "old", annual_rent: 1 });
+    input.leases.unshift({ ...required(input.leases, 1), id: "inactive", is_active: false, unit_id: "u2" });
     const result = assembleAssetSheet(input, NOW);
     expect(result.leases).toHaveLength(2);
     expect(result.leases[0]).toMatchObject({ unitId: "u1", annualRent: 90000, tenantName: "Locataire test" });
@@ -58,7 +64,7 @@ describe("fiche actif : import en vigueur", () => {
   });
   it("produit exactement une ligne par lot avec les champs complets du bail", () => {
     const input = fixture();
-    input.leases.push({ ...input.leases[0], id: "duplicate" });
+    input.leases.push({ ...required(input.leases, 0), id: "duplicate" });
     const result = assembleAssetSheet(input, NOW);
     expect(result.leases).toHaveLength(input.units.length);
     expect(result.leases[0]).toMatchObject({
@@ -68,13 +74,13 @@ describe("fiche actif : import en vigueur", () => {
   });
   it("calcule la vacance du lot sans inventer zéro pour une date absente", () => {
     const input = fixture();
-    expect(assembleAssetSheet(input, NOW).leases[1].vacantMonths).toBe(6);
-    input.units[1].vacant_since = null;
-    expect(assembleAssetSheet(input, NOW).leases[1].vacantMonths).toBeNull();
+    expect(required(assembleAssetSheet(input, NOW).leases, 1).vacantMonths).toBe(6);
+    required(input.units, 1).vacant_since = null;
+    expect(required(assembleAssetSheet(input, NOW).leases, 1).vacantMonths).toBeNull();
   });
   it("retient tous les prêts et seulement ceux de l'import en vigueur", () => {
     const input = fixture();
-    input.loans.push({ ...input.loans[0], id: "loan2" }, { ...input.loans[0], id: "old", import_id: "old" });
+    input.loans.push({ ...required(input.loans, 0), id: "loan2" }, { ...required(input.loans, 0), id: "old", import_id: "old" });
     expect(assembleAssetSheet(input, NOW).loans.map((l) => l.id)).toEqual(["loan1", "loan2"]);
   });
   it("ne transmet pas l'encours de dette à l'interface", () => {
@@ -84,11 +90,11 @@ describe("fiche actif : import en vigueur", () => {
   });
   it("utilise la zone ambre à covenant moins 5 points, sans division par zéro", () => {
     const input = fixture();
-    expect(assembleAssetSheet(input, NOW).loans[0].covenantNear).toBe(true);
-    input.loans[0].ltv = 49.9;
-    expect(assembleAssetSheet(input, NOW).loans[0].covenantNear).toBe(false);
-    input.loans[0].ltv_covenant = 0;
-    expect(assembleAssetSheet(input, NOW).loans[0].ltvProgress).toBeNull();
+    expect(required(assembleAssetSheet(input, NOW).loans, 0).covenantNear).toBe(true);
+    required(input.loans, 0).ltv = 49.9;
+    expect(required(assembleAssetSheet(input, NOW).loans, 0).covenantNear).toBe(false);
+    required(input.loans, 0).ltv_covenant = 0;
+    expect(required(assembleAssetSheet(input, NOW).loans, 0).ltvProgress).toBeNull();
   });
   it("reprend exactement toutes les alertes du tableau de bord pour cet actif", () => {
     const input = fixture();
@@ -100,7 +106,7 @@ describe("fiche actif : import en vigueur", () => {
   });
   it("affiche le BP courant et les précédents du même import par date décroissante", () => {
     const input = fixture();
-    input.bpVersions.push({ ...input.bpVersions[1], id: "old", import_id: "old", version_date: "2027-01-01" });
+    input.bpVersions.push({ ...required(input.bpVersions, 1), id: "old", import_id: "old", version_date: "2027-01-01" });
     const result = assembleAssetSheet(input, NOW);
     expect(result.bp?.id).toBe("bp3");
     expect(result.previousBpVersions.map((v) => v.id)).toEqual(["bp2", "bp1"]);
