@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { buildAlerts, type AssetAlert } from "./alerts";
+import { buildAlerts, buildDashboardAlerts, type AssetAlert, type DashboardAlert } from "./alerts";
 
 
 export type SourceRibbon = {
@@ -15,32 +15,33 @@ export type SourceRibbon = {
 export type DashboardAssetRow = {
   assetId: string;
   name: string;
-  city: string;
+  city: string | null;
   areaSqm: number | null;
   marketValue: number | null;
+  annualRent: number | null;
   occupancyRate: number | null;
   ltv: number | null;
-  ltvCovenant: number | null;
-  nextExpiry: string | null;
-  updatedAt: string | null;
+  asOfDate: string | null;
 };
 
 export type DashboardDto = {
   fullName: string;
   investorName: string;
-  investorCode: string;
   isAdmin: boolean;
+  investors: { id: string; name: string }[];
+  selectedInvestorId: string | null;
+  hasData: boolean;
   latestDataDate: string | null;
+  oldestDataDate: string | null;
   totalValue: number | null;
   totalAnnualRent: number | null;
   occupancyRate: number | null;
   portfolioLtv: number | null;
   assetsCount: number | null;
   assets: DashboardAssetRow[];
-  alerts: AssetAlert[];
-  rentBars: { assetId: string; name: string; rent: number }[];
+  alerts: DashboardAlert[];
   lastReport: { periodLabel: string; validatedAt: string | null; pdfPath: string | null } | null;
-  source: SourceRibbon | null;
+  lastImportAt: string | null;
 };
 
 export type LeaseRowDto = {
@@ -179,9 +180,14 @@ export const whoami = createServerFn({ method: "GET" })
     };
   });
 
+const NO_ID = "00000000-0000-0000-0000-000000000000";
+
 export const getDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<DashboardDto> => {
+  .inputValidator((input: { investorId?: string | null } | undefined) => ({
+    investorId: typeof input?.investorId === "string" ? input.investorId : null,
+  }))
+  .handler(async ({ context, data: input }): Promise<DashboardDto> => {
     const supabase = context.supabase;
 
     const { data: profile } = await supabase
@@ -189,147 +195,119 @@ export const getDashboard = createServerFn({ method: "GET" })
       .select("full_name, role, investor_id")
       .eq("id", context.userId)
       .maybeSingle();
+    const isAdmin = profile?.role === "admin";
 
-    const { data: investorList } = await supabase
-      .from("investors")
-      .select("id, name, code")
-      .order("code");
+    const { data: investorList } = await supabase.from("investors").select("id, name").order("name");
 
-    const { data: portfolios } = await supabase
-      .from("portfolio_summary")
-      .select(
-        "investor_id, assets_count, latest_data_date, total_value, total_annual_rent, occupancy_rate, portfolio_ltv",
-      );
-
-    // L'administratrice n'est rattachée à aucun fonds : elle consulte le premier
-    // portefeuille par ordre de code.
-    const targetId = profile?.investor_id ?? investorList?.[0]?.id ?? null;
-    const portfolio = portfolios?.find((p) => p.investor_id === targetId) ?? portfolios?.[0];
-    const investorId = portfolio?.investor_id ?? targetId;
+    // Investisseur : la RLS ne renvoie que son portefeuille. Administratrice : investisseur choisi.
+    const investorId = isAdmin
+      ? (input.investorId ?? investorList?.[0]?.id ?? null)
+      : (profile?.investor_id ?? null);
     const investor = investorList?.find((row) => row.id === investorId) ?? null;
 
-    const { data: summaries } = await supabase
+    let portfolioQuery = supabase
+      .from("portfolio_summary")
+      .select(
+        "investor_id, assets_count, latest_data_date, oldest_data_date, total_value, total_annual_rent, occupancy_rate, portfolio_ltv",
+      );
+    if (investorId) portfolioQuery = portfolioQuery.eq("investor_id", investorId);
+    const { data: portfolios } = await portfolioQuery;
+    const portfolio = portfolios?.[0] ?? null;
+
+    let summaryQuery = supabase
       .from("asset_summary")
       .select(
-        "asset_id, name, city, lettable_area_sqm, market_value, occupancy_rate, ltv, annual_rent, vacant_area_sqm, import_id, investor_id",
+        "asset_id, name, city, lettable_area_sqm, market_value, annual_rent, occupancy_rate, ltv, as_of_date, import_id, investor_id",
       )
       .order("name");
+    if (investorId) summaryQuery = summaryQuery.eq("investor_id", investorId);
+    const { data: summaries } = await summaryQuery;
+    const rows = (summaries ?? []).filter((r) => r.asset_id && r.import_id);
 
-    const rows = (investorId
-      ? summaries?.filter((s) => s.investor_id === investorId)
-      : summaries) ?? [];
+    const assetIds = rows.map((r) => r.asset_id as string);
+    const importIds = rows.map((r) => r.import_id as string);
+    const ids = assetIds.length ? assetIds : [NO_ID];
+    const imps = importIds.length ? importIds : [NO_ID];
 
-    const assetIds = rows.map((r) => r.asset_id).filter((id): id is string => Boolean(id));
+    const [{ data: leases }, { data: loans }, { data: units }, { data: importRows }] =
+      await Promise.all([
+        supabase
+          .from("leases")
+          .select("asset_id, import_id, is_active, end_date, break_date, tenant:tenants(name)")
+          .eq("is_active", true)
+          .in("asset_id", ids)
+          .in("import_id", imps),
+        supabase
+          .from("loans")
+          .select("asset_id, import_id, ltv, ltv_covenant")
+          .in("asset_id", ids)
+          .in("import_id", imps),
+        supabase
+          .from("units")
+          .select("asset_id, label, vacant_since")
+          .not("vacant_since", "is", null)
+          .in("asset_id", ids),
+        supabase.from("imports").select("imported_at").in("id", imps).order("imported_at", { ascending: false }).limit(1),
+      ]);
 
-    const { data: loans } = await supabase
-      .from("loans")
-      .select("asset_id, ltv, ltv_covenant")
-      .in("asset_id", assetIds.length ? assetIds : ["00000000-0000-0000-0000-000000000000"]);
-
-    const { data: expiries } = await supabase
-      .from("leases")
-      .select("asset_id, end_date, tenant:tenants(name)")
-      .eq("is_active", true)
-      .in("asset_id", assetIds.length ? assetIds : ["00000000-0000-0000-0000-000000000000"]);
-
-    const { data: vacancies } = await supabase
-      .from("units")
-      .select("asset_id, area_sqm, floor, vacant_since")
-      .not("vacant_since", "is", null)
-      .in("asset_id", assetIds.length ? assetIds : ["00000000-0000-0000-0000-000000000000"]);
-
-    const expiryByAsset = new Map<string, string>();
-    for (const lease of expiries ?? []) {
-      const assetId = lease.asset_id as string;
-      const current = expiryByAsset.get(assetId);
-      if (!current || lease.end_date < current) expiryByAsset.set(assetId, lease.end_date);
-    }
-
-    const importIds = rows.map((r) => r.import_id).filter((id): id is string => Boolean(id));
-    const { data: importRows } = await supabase
-      .from("imports")
-      .select("id, imported_at")
-      .in("id", importIds.length ? importIds : ["00000000-0000-0000-0000-000000000000"]);
-    const importedAtById = new Map((importRows ?? []).map((i) => [i.id, i.imported_at]));
-
-    const assets: DashboardAssetRow[] = rows.map((row) => ({
-      assetId: row.asset_id as string,
-      name: row.name as string,
-      city: row.city as string,
-      areaSqm: row.lettable_area_sqm,
-      marketValue: row.market_value,
-      occupancyRate: row.occupancy_rate,
-      ltv: row.ltv,
-      ltvCovenant: loans?.find((l) => l.asset_id === row.asset_id)?.ltv_covenant ?? null,
-      nextExpiry: expiryByAsset.get(row.asset_id as string) ?? null,
-      updatedAt: row.import_id ? (importedAtById.get(row.import_id) ?? null) : null,
-    }));
-
-    const alerts = buildAlerts(
-      rows.map((r) => ({
-        assetId: r.asset_id as string,
-        name: r.name as string,
-        vacantAreaSqm: r.vacant_area_sqm,
+    const alerts = buildDashboardAlerts(
+      rows.map((r) => ({ assetId: r.asset_id as string, name: r.name ?? "", importId: r.import_id })),
+      (leases ?? []).map((l: any) => ({
+        asset_id: l.asset_id,
+        import_id: l.import_id,
+        is_active: l.is_active,
+        end_date: l.end_date,
+        break_date: l.break_date,
+        tenant_name: l.tenant?.name ?? "",
       })),
-      loans ?? [],
-      (expiries ?? [])
-        .filter((e) => e.end_date && (e as any).tenant?.name)
-        .map((e) => ({
-          asset_id: e.asset_id as string,
-          tenant_name: (e as any).tenant.name as string,
-          end_date: e.end_date,
-        })),
-      (vacancies ?? [])
-        .filter((v) => v.vacant_since)
-        .map((v) => ({
-          asset_id: v.asset_id as string,
-          area_sqm: Number(v.area_sqm),
-          floor: v.floor,
-          vacant_since: v.vacant_since as string,
-        })),
+      (loans ?? []).map((l) => ({
+        asset_id: l.asset_id,
+        import_id: l.import_id,
+        ltv: l.ltv == null ? null : Number(l.ltv),
+        ltv_covenant: l.ltv_covenant == null ? null : Number(l.ltv_covenant),
+      })),
+      units ?? [],
     );
 
-    const rentBars = rows
-      .filter((r) => r.annual_rent != null)
-      .map((r) => ({
-        assetId: r.asset_id as string,
-        name: r.name as string,
-        rent: Number(r.annual_rent),
-      }))
-      .sort((a, b) => b.rent - a.rent);
-
-    const { data: report } = await supabase
+    let reportQuery = supabase
       .from("reports")
       .select("period_label, validated_at, pdf_path")
       .in("status", ["valide", "envoye"])
       .order("period_end", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const sourceImportId = rows.find((r) => r.import_id)?.import_id ?? null;
+      .limit(1);
+    if (investorId) reportQuery = reportQuery.eq("investor_id", investorId);
+    const { data: report } = await reportQuery.maybeSingle();
 
     return {
       fullName: profile?.full_name ?? "",
       investorName: investor?.name ?? "",
-      investorCode: investor?.code ?? "",
-      isAdmin: profile?.role === "admin",
+      isAdmin,
+      investors: isAdmin ? (investorList ?? []) : [],
+      selectedInvestorId: investorId,
+      hasData: Boolean(portfolio) && rows.length > 0,
       latestDataDate: portfolio?.latest_data_date ?? null,
+      oldestDataDate: portfolio?.oldest_data_date ?? null,
       totalValue: portfolio?.total_value ?? null,
       totalAnnualRent: portfolio?.total_annual_rent ?? null,
       occupancyRate: portfolio?.occupancy_rate ?? null,
       portfolioLtv: portfolio?.portfolio_ltv ?? null,
-      assetsCount: portfolio?.assets_count ?? rows.length,
-      assets,
+      assetsCount: portfolio?.assets_count ?? null,
+      assets: rows.map((row) => ({
+        assetId: row.asset_id as string,
+        name: row.name ?? "",
+        city: row.city,
+        areaSqm: row.lettable_area_sqm,
+        marketValue: row.market_value,
+        annualRent: row.annual_rent,
+        occupancyRate: row.occupancy_rate,
+        ltv: row.ltv,
+        asOfDate: row.as_of_date,
+      })),
       alerts,
-      rentBars,
       lastReport: report
-        ? {
-            periodLabel: report.period_label,
-            validatedAt: report.validated_at,
-            pdfPath: report.pdf_path,
-          }
+        ? { periodLabel: report.period_label, validatedAt: report.validated_at, pdfPath: report.pdf_path }
         : null,
-      source: await loadSource(supabase, sourceImportId),
+      lastImportAt: importRows?.[0]?.imported_at ?? null,
     };
   });
 

@@ -10,17 +10,17 @@ function number(value: number, minDigits = 0, maxDigits = 2): string {
 }
 
 /** 92 600 000 -> « 92,6 M€ » (3 chiffres significatifs, comme dans la maquette). */
-export function formatMillions(value: number | null | undefined): string {
+export function formatMillions(value: number | null | undefined, fixedDigits?: number): string {
   if (value == null || Number.isNaN(value)) return "—";
   const millions = value / 1_000_000;
-  const digits = millions >= 100 ? 0 : millions >= 10 ? 1 : 2;
+  const digits = fixedDigits ?? (millions >= 100 ? 0 : millions >= 10 ? 1 : 2);
   return `${number(millions, digits, digits)}${NBSP}M€`;
 }
 
 /** 81.9 -> « 82 % » (les indicateurs de la maquette sont en pourcent rond). */
-export function formatPercent(value: number | null | undefined): string {
+export function formatPercent(value: number | null | undefined, digits = 0): string {
   if (value == null || Number.isNaN(value)) return "—";
-  return `${number(value, 0, 0)}${NBSP}%`;
+  return `${number(value, digits, digits)}${NBSP}%`;
 }
 
 /** 5.0 -> « 5,0 % » (rendements et TRI gardent une décimale). */
