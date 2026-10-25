@@ -161,3 +161,21 @@ export function buildDashboardAlerts(
   const order = { bail: 0, financement: 1, vacance: 2 } as const;
   return alerts.sort((a, b) => order[a.kind] - order[b.kind] || a.assetName.localeCompare(b.assetName, "fr"));
 }
+
+/**
+ * « Prochaine échéance » d'un actif : la date à venir la plus proche parmi les
+ * dates fournies (fins de bail, options de sortie, échéances de prêt). Les
+ * dates déjà passées sont ignorées ; sans date à venir, aucune échéance.
+ */
+export function nextEventDate(
+  dates: (string | null | undefined)[],
+  now = new Date(),
+): string | null {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return (
+    dates
+      .filter((value): value is string => Boolean(value))
+      .filter((value) => new Date(`${value.slice(0, 10)}T00:00:00`) >= today)
+      .sort((a, b) => a.slice(0, 10).localeCompare(b.slice(0, 10)))[0] ?? null
+  );
+}

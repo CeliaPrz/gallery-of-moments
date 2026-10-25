@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { buildAlerts, buildDashboardAlerts, type AssetAlert, type DashboardAlert } from "./alerts";
+import { buildAlerts, buildDashboardAlerts, nextEventDate, type AssetAlert, type DashboardAlert } from "./alerts";
 
 
 export type SourceRibbon = {
@@ -22,6 +22,7 @@ export type DashboardAssetRow = {
   occupancyRate: number | null;
   ltv: number | null;
   asOfDate: string | null;
+  nextEventDate: string | null;
 };
 
 export type DashboardDto = {
@@ -239,7 +240,7 @@ export const getDashboard = createServerFn({ method: "GET" })
           .in("import_id", imps),
         supabase
           .from("loans")
-          .select("asset_id, import_id, ltv, ltv_covenant")
+          .select("asset_id, import_id, ltv, ltv_covenant, maturity_date")
           .in("asset_id", ids)
           .in("import_id", imps),
         supabase
@@ -268,6 +269,25 @@ export const getDashboard = createServerFn({ method: "GET" })
       })),
       units ?? [],
     );
+
+    // « Prochaine échéance » : la date à venir la plus proche parmi les baux actifs
+    // (fin, option de sortie) et l'échéance du prêt de l'import en vigueur.
+    const isCurrentRow = (assetId: string, importId: string) =>
+      rows.some((r) => r.asset_id === assetId && r.import_id === importId);
+    const eventDates = new Map<string, string[]>();
+    const pushDate = (assetId: string, value: string | null) => {
+      if (!value) return;
+      eventDates.set(assetId, [...(eventDates.get(assetId) ?? []), value]);
+    };
+    for (const lease of leases ?? []) {
+      if (!lease.is_active || !isCurrentRow(lease.asset_id, lease.import_id)) continue;
+      pushDate(lease.asset_id, lease.end_date);
+      pushDate(lease.asset_id, lease.break_date);
+    }
+    for (const loan of loans ?? []) {
+      if (!isCurrentRow(loan.asset_id, loan.import_id)) continue;
+      pushDate(loan.asset_id, loan.maturity_date);
+    }
 
     let reportQuery = supabase
       .from("reports")
@@ -302,6 +322,7 @@ export const getDashboard = createServerFn({ method: "GET" })
         occupancyRate: row.occupancy_rate,
         ltv: row.ltv,
         asOfDate: row.as_of_date,
+        nextEventDate: nextEventDate(eventDates.get(row.asset_id as string) ?? []),
       })),
       alerts,
       lastReport: report
