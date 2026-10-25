@@ -42,7 +42,7 @@ const fixture = (): AssetSheetInput => ({
   }],
   loans: [{
     id: "loan1", asset_id: "a", import_id: "current", lender: "Prêteur test", maturity_date: "2030-01-01",
-    ltv: 50, ltv_covenant: 55, icr: 2.1, icr_covenant: 1.5, interest_rate: 3.5,
+    ltv: 50, ltv_covenant: 55, icr: 2.1, icr_covenant: 1.5, interest_rate: 3.5, outstanding: 625000,
     rate_type: "variable", reference_index: "EURIBOR", amortization_type: "in fine",
   }],
   bpVersions: [
