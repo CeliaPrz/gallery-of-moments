@@ -277,7 +277,7 @@ export const getAssetSheet = createServerFn({ method: "GET" })
       supabase.from("leases").select("*, tenant:tenants(name)").eq("asset_id", assetId)
         .eq("import_id", scopedImportId).eq("is_active", true).order("start_date", { ascending: false, nullsFirst: false }).order("id"),
       supabase.from("loans")
-        .select("id, asset_id, import_id, lender, maturity_date, ltv, ltv_covenant, icr, icr_covenant, amortization_type, interest_rate, rate_type, reference_index")
+        .select("id, asset_id, import_id, lender, maturity_date, ltv, ltv_covenant, icr, icr_covenant, amortization_type, interest_rate, rate_type, reference_index, outstanding")
         .eq("asset_id", assetId).eq("import_id", scopedImportId).order("lender").order("id"),
       supabase.from("bp_versions").select("*").eq("asset_id", assetId).eq("import_id", scopedImportId)
         .order("version_date", { ascending: false }).order("id"),
