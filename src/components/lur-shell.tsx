@@ -120,7 +120,7 @@ export function LurShell({
         type="button"
         aria-label="Afficher le menu"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 left-6 z-50 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-on-primary shadow-lg lg:hidden"
+        className="fixed bottom-6 left-6 z-50 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-on-primary shadow-lg md:hidden"
       >
         <MaterialIcon name="menu" className="text-[24px]" />
       </button>
@@ -234,7 +234,7 @@ export function LurShell({
         </div>
       </aside>
 
-      <div className="lg:pl-[280px]">{children}</div>
+      <div className="md:pl-[280px]">{children}</div>
     </div>
   );
 }
