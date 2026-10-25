@@ -29,8 +29,8 @@ const assetQueryOptions = (assetId: string) =>
   });
 
 export const Route = createFileRoute("/_authenticated/actifs/$assetId")({
-  validateSearch: (search: Record<string, unknown>): { onglet: TabId } => ({
-    onglet: TABS.some((t) => t.id === search.onglet) ? search.onglet as TabId : "synthese",
+  validateSearch: (search: Record<string, unknown>): { onglet?: TabId } => ({
+    onglet: TABS.some((t) => t.id === search['onglet']) ? search['onglet'] as TabId : "synthese",
   }),
   loader: ({ params, context }) =>
     context.queryClient.ensureQueryData(assetQueryOptions(params.assetId)),
@@ -40,13 +40,13 @@ export const Route = createFileRoute("/_authenticated/actifs/$assetId")({
       {
         name: "description",
         content:
-          "Fiche d'un actif : synthèse, baux et locataires, financement et business plan et documents.",
+          "Fiche d'un actif : synthèse, baux et locataires, financement, business plan et documents.",
       },
       { property: "og:title", content: "Fiche actif — LUR Gestion d'actifs" },
       {
         property: "og:description",
         content:
-          "Fiche d'un actif : synthèse, baux et locataires, financement et business plan et documents.",
+          "Fiche d'un actif : synthèse, baux et locataires, financement, business plan et documents.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -90,7 +90,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="p-5">
+    <section className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-sm">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <MaterialIcon name={icon} className="text-[20px] text-surface-tint" />
@@ -106,7 +106,7 @@ function SectionCard({
 function AssetSheetPage() {
   const { assetId } = Route.useParams();
   const { data } = useSuspenseQuery(assetQueryOptions(assetId));
-  const { onglet: tab } = Route.useSearch();
+  const { onglet: tab = "synthese" } = Route.useSearch();
   const navigate = Route.useNavigate();
   const downloadDocument = useServerFn(getDocumentDownload);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -147,13 +147,13 @@ function AssetSheetPage() {
     >
       <main className="mx-auto max-w-[1200px] space-y-6 p-6 tabular-nums lg:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <nav className="flex items-center gap-1 font-body-sm text-secondary">
+          <nav className="flex min-w-0 flex-wrap items-center gap-1 font-body-sm text-secondary">
             <Link to="/" className="flex items-center gap-1 hover:text-primary">
               <MaterialIcon name="grid_view" className="text-[16px]" />
               Tableau de bord
             </Link>
             <MaterialIcon name="chevron_right" className="text-[16px]" />
-            <span className="text-on-surface">{data.asset.name}</span>
+            <span className="min-w-0 break-words text-on-surface">{data.asset.name}</span>
           </nav>
           <div className="flex items-center gap-2 rounded-lg bg-surface-container-high px-3 py-1.5">
             <MaterialIcon name="lock" className="text-[16px] text-surface-tint" />
@@ -170,9 +170,9 @@ function AssetSheetPage() {
                 onError={() => setFailedPhotoUrl(data.photoUrl)} />
             ) : <MaterialIcon name="apartment" className="text-[26px]" />}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="font-display-md text-display-md text-on-surface">{data.asset.name}</h1>
+              <h1 className="min-w-0 break-words font-display-md text-display-md text-on-surface">{data.asset.name}</h1>
               {data.alerts.length > 0 && (
                 <span className="rounded-full bg-alert-amber/10 px-3 py-1 font-label-sm text-[10px] uppercase tracking-wider text-alert-amber">
                   {data.alerts.length} alerte{data.alerts.length > 1 ? "s" : ""}
@@ -309,7 +309,7 @@ function AssetSheetPage() {
         )}
 
         {tab === "baux" && data.hasData && (
-          <SectionCard
+          <div id="panel-baux" role="tabpanel"><SectionCard
             icon="groups"
             title="Baux et locataires"
             meta={`${data.counts.activeTenants} locataires sous bail actif · ${data.counts.vacantLots} lot vacant`}
@@ -393,7 +393,7 @@ function AssetSheetPage() {
               </table>
             </div>
             <div className="mt-5"><SourceRibbonBar source={data.source} /></div>
-          </SectionCard>
+          </SectionCard></div>
         )}
 
         {tab === "finance" && data.hasData && (

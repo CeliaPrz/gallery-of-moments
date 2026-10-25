@@ -294,7 +294,7 @@ export const getAssetSheet = createServerFn({ method: "GET" })
     if (asset.photo_path) {
       const { data: photo } = await supabase.storage.from("asset-photos").createSignedUrl(asset.photo_path, 3600);
       if (photo?.signedUrl) photoUrl = storageUrlForBrowser(
-        photo.signedUrl, process.env["SUPABASE_URL"], import.meta.env.VITE_SUPABASE_URL,
+        photo.signedUrl, process.env["SUPABASE_URL"], import.meta.env['VITE_SUPABASE_URL'],
       );
     }
     return {
@@ -326,7 +326,7 @@ export const getDocumentDownload = createServerFn({ method: "POST" })
     const { data: signed, error: signingError } = await context.supabase.storage.from("documents")
       .createSignedUrl(document.file_path, 60, { download: document.name });
     if (signingError || !signed?.signedUrl) throw new Error("Ce document n'est pas disponible.");
-    return { url: storageUrlForBrowser(signed.signedUrl, process.env["SUPABASE_URL"], import.meta.env.VITE_SUPABASE_URL) };
+    return { url: storageUrlForBrowser(signed.signedUrl, process.env["SUPABASE_URL"], import.meta.env['VITE_SUPABASE_URL']) };
   });
 
 export const getImportContext = createServerFn({ method: "GET" })
