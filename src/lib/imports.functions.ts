@@ -58,7 +58,7 @@ export const getImportInvestorContext = createServerFn({ method: "GET" })
         investorId: data.investorId,
         investorCode: investor.data.code,
         existingAssets: (assets.data ?? []).map((a) => ({ code: a.code, investorId: a.investor_id })),
-        existingUnits: (units.data ?? []).map((u) => ({ assetCode: codeById.get(u.asset_id) ?? "", label: u.label })),
+        existingUnits: (units.data ?? []).map((u) => ({ assetCode: codeById.get(u["asset_id"]) ?? "", label: u["label"] })),
         currentAsOf: (summaries.data ?? []).map((s) => ({ assetCode: s.code as string, asOfDate: s.as_of_date })),
       },
       lastImports: (imports.data ?? []).map((i) => ({
@@ -138,7 +138,7 @@ export const commitImport = createServerFn({ method: "POST" })
       fail("Lecture des actifs", e1);
       const assetIdByCode = new Map<string, string>();
       for (const row of p.assets) {
-        const code = String(row.code);
+        const code = String(row["code"]);
         const found = (existing ?? []).find((a) => a.code === code);
         if (!found) {
           const { data: inserted, error } = await supabase
@@ -166,23 +166,23 @@ export const commitImport = createServerFn({ method: "POST" })
       // 4. Lots : création ou mise à jour par (actif, lot), sans suppression.
       const { data: dbUnits, error: e2 } = await supabase.from("units").select("id, asset_id, label").in("asset_id", assetIds);
       fail("Lecture des lots", e2);
-      const unitId = new Map((dbUnits ?? []).map((u) => [`${u.asset_id}\u0000${u.label}`, u.id]));
+      const unitId = new Map((dbUnits ?? []).map((u) => [`${u["asset_id"]}\u0000${u["label"]}`, u.id]));
       for (const row of p.units) {
-        const assetId = assetIdByCode.get(String(row.asset_code))!;
-        const key = `${assetId}\u0000${String(row.label)}`;
+        const assetId = assetIdByCode.get(String(row["asset_code"]))!;
+        const key = `${assetId}\u0000${String(row["label"])}`;
         const fields = pick(row, ["floor", "area_sqm", "use_type", "vacant_since"]);
         const id = unitId.get(key);
         if (id) {
           const { error } = await supabase.from("units").update(fields).eq("id", id);
-          fail(`Mise à jour du lot ${String(row.label)}`, error);
+          fail(`Mise à jour du lot ${String(row["label"])}`, error);
         } else {
           const { data: inserted, error } = await supabase
             .from("units")
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .insert({ asset_id: assetId, label: String(row.label), ...fields } as any)
+            .insert({ asset_id: assetId, label: String(row["label"]), ...fields } as any)
             .select("id")
             .single();
-          fail(`Création du lot ${String(row.label)}`, error);
+          fail(`Création du lot ${String(row["label"])}`, error);
           unitId.set(key, inserted!.id);
         }
       }
@@ -195,15 +195,15 @@ export const commitImport = createServerFn({ method: "POST" })
       fail("Lecture des locataires", e3);
       const tenantId = new Map<string, string>();
       for (const row of p.tenants) {
-        const name = String(row.name);
+        const name = String(row["name"]);
         const key = normalizeName(name);
         if (tenantId.has(key)) continue;
         const found = (dbTenants ?? []).find((t) => normalizeName(t.name) === key);
         if (found) {
           tenantId.set(key, found.id);
           const patch: Record<string, Value> = {};
-          if (!found.sector && row.sector) patch.sector = row.sector;
-          if (!found.tax_id && row.tax_id) patch.tax_id = row.tax_id;
+          if (!found.sector && row["sector"]) patch["sector"] = row["sector"];
+          if (!found.tax_id && row["tax_id"]) patch["tax_id"] = row["tax_id"];
           if (Object.keys(patch).length) {
             const { error } = await supabase.from("tenants").update(patch).eq("id", found.id);
             fail(`Complément du locataire ${name}`, error);
@@ -214,8 +214,8 @@ export const commitImport = createServerFn({ method: "POST" })
             .insert({
               investor_id: data.investorId,
               name,
-              sector: (row.sector as string | null) ?? null,
-              tax_id: (row.tax_id as string | null) ?? null,
+              sector: (row["sector"] as string | null) ?? null,
+              tax_id: (row["tax_id"] as string | null) ?? null,
             })
             .select("id")
             .single();
@@ -225,7 +225,7 @@ export const commitImport = createServerFn({ method: "POST" })
       }
 
       // 6. Données chiffrées rattachées au nouvel import.
-      const aid = (row: Record<string, Value>) => assetIdByCode.get(String(row.asset_code ?? row.code))!;
+      const aid = (row: Record<string, Value>) => assetIdByCode.get(String(row["asset_code"] ?? row["code"]))!;
       const kpis = p.assets.map((row) => ({
         asset_id: aid(row),
         import_id: importId,
@@ -238,8 +238,8 @@ export const commitImport = createServerFn({ method: "POST" })
       const leases = p.leases.map((row) => ({
         asset_id: aid(row),
         import_id: importId,
-        unit_id: unitId.get(`${aid(row)}\u0000${String(row.unit_label)}`)!,
-        tenant_id: tenantId.get(normalizeName(String(row.tenant_name)))!,
+        unit_id: unitId.get(`${aid(row)}\u0000${String(row["unit_label"])}`)!,
+        tenant_id: tenantId.get(normalizeName(String(row["tenant_name"])))!,
         is_active: true,
         ...pick(row, [
           "start_date", "end_date", "break_date", "annual_rent", "indexation", "area_sqm", "parking_spaces",
@@ -264,7 +264,7 @@ export const commitImport = createServerFn({ method: "POST" })
       const bp = p.bpVersions.map((row) => ({
         asset_id: aid(row),
         import_id: importId,
-        is_current: row.is_current === "oui",
+        is_current: row["is_current"] === "oui",
         ...pick(row, ["version_label", "version_date", "initial_yield", "target_irr", "comment"]),
       }));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -284,7 +284,7 @@ export const commitImport = createServerFn({ method: "POST" })
         for (const table of ["asset_kpis", "leases", "loans", "bp_versions"] as const) {
           const { data: linked, error } = await supabase.from(table).select("import_id, asset_id").in("import_id", prevIds);
           fail("Lecture des imports précédents", error);
-          for (const l of linked ?? []) coverage.get(l.import_id)?.add(l.asset_id);
+          for (const l of linked ?? []) coverage.get(l["import_id"])?.add(l["asset_id"]);
         }
       }
       const replaced = importsToReplace(

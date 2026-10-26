@@ -383,9 +383,9 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
   if (workbook[SHEETS.params] && !param) {
     errors.push(msg(SHEETS.params, 2, null, "aucune valeur renseignée", `Complétez la ligne 2 de l'onglet ${AGAIN}`));
   }
-  const investorCode = str(param?.values.investor_code ?? null);
-  const asOfDate = str(param?.values.as_of_date ?? null);
-  const version = str(param?.values.template_version ?? null);
+  const investorCode = str(param?.values["investor_code"] ?? null);
+  const asOfDate = str(param?.values["as_of_date"] ?? null);
+  const version = str(param?.values["template_version"] ?? null);
   if (param && investorCode && investorCode !== context.investorCode) {
     errors.push(
       msg(
@@ -408,7 +408,7 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
   const assetByCode = new Map<string, Row>();
   const existingByCode = new Map(context.existingAssets.map((a) => [a.code, a.investorId]));
   for (const row of assets) {
-    const code = str(row.values.code ?? null);
+    const code = str(row.values["code"] ?? null);
     if (!code) continue;
     if (assetCodes.has(code)) {
       errors.push(msg(SHEETS.assets, row.line, "Code actif", `le code « ${code} » est en double`, `Gardez une seule ligne par actif ${AGAIN}`));
@@ -429,7 +429,7 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
     [SHEETS.bp, bp],
   ] as const) {
     for (const row of list) {
-      const code = str(row.values.asset_code ?? null);
+      const code = str(row.values["asset_code"] ?? null);
       if (code && !assetCodes.has(code)) {
         errors.push(
           msg(sheetName, row.line, "Code actif", `le code « ${code} » est absent de l'onglet Actifs`, `Ajoutez l'actif dans l'onglet Actifs ou corrigez le code ${AGAIN}`),
@@ -440,21 +440,21 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
 
   const unitKeys = new Set<string>();
   for (const row of units) {
-    const key = `${str(row.values.asset_code ?? null)}\u0000${str(row.values.label ?? null)}`;
-    if (!row.values.asset_code || !row.values.label) continue;
+    const key = `${str(row.values["asset_code"] ?? null)}\u0000${str(row.values["label"] ?? null)}`;
+    if (!row.values["asset_code"] || !row.values["label"]) continue;
     if (unitKeys.has(key)) {
       errors.push(
-        msg(SHEETS.units, row.line, "Lot", `le lot « ${str(row.values.label)} » est en double pour l'actif ${str(row.values.asset_code)}`, `Gardez une seule ligne par lot ${AGAIN}`),
+        msg(SHEETS.units, row.line, "Lot", `le lot « ${str(row.values["label"])} » est en double pour l'actif ${str(row.values["asset_code"])}`, `Gardez une seule ligne par lot ${AGAIN}`),
       );
     }
     unitKeys.add(key);
   }
-  const tenantNames = new Set(tenants.map((t) => normalizeName(str(t.values.name ?? null))).filter(Boolean));
+  const tenantNames = new Set(tenants.map((t) => normalizeName(str(t.values["name"] ?? null))).filter(Boolean));
   const leasedUnits = new Set<string>();
   for (const row of leases) {
-    const code = str(row.values.asset_code ?? null);
-    const label = str(row.values.unit_label ?? null);
-    const tenant = str(row.values.tenant_name ?? null);
+    const code = str(row.values["asset_code"] ?? null);
+    const label = str(row.values["unit_label"] ?? null);
+    const tenant = str(row.values["tenant_name"] ?? null);
     if (code && label) {
       leasedUnits.add(`${code}\u0000${label}`);
       if (assetCodes.has(code) && !unitKeys.has(`${code}\u0000${label}`)) {
@@ -472,7 +472,7 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
 
   // 7 et 8. Business plan en vigueur et lots par actif.
   for (const [code, row] of assetByCode) {
-    const current = bp.filter((b) => b.values.asset_code === code && b.values.is_current === "oui").length;
+    const current = bp.filter((b) => b.values["asset_code"] === code && b.values["is_current"] === "oui").length;
     if (current !== 1) {
       errors.push(
         msg(
@@ -484,7 +484,7 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
         ),
       );
     }
-    if (!units.some((u) => u.values.asset_code === code)) {
+    if (!units.some((u) => u.values["asset_code"] === code)) {
       errors.push(
         msg(SHEETS.assets, row.line, "Code actif", `l'actif ${code} n'a aucun lot dans l'onglet Lots`, `Ajoutez au moins un lot pour cet actif ${AGAIN}`),
       );
@@ -493,29 +493,29 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
 
   // Avertissements de cohérence.
   for (const [code, row] of assetByCode) {
-    const assetRent = num(row.values.annual_rent ?? null);
-    const assetLeases = leases.filter((l) => l.values.asset_code === code);
+    const assetRent = num(row.values["annual_rent"] ?? null);
+    const assetLeases = leases.filter((l) => l.values["asset_code"] === code);
     if (assetRent != null && assetLeases.length > 0) {
-      const rents = assetLeases.map((l) => num(l.values.annual_rent ?? null));
+      const rents = assetLeases.map((l) => num(l.values["annual_rent"] ?? null));
       if (rents.every((r) => r != null) && !same(rents.reduce<number>((a, b) => a + (b ?? 0), 0), assetRent)) {
         warnings.push(
           msg(SHEETS.leases, null, "Loyer annuel (€)", `pour l'actif ${code}, la somme des loyers des baux est différente du loyer annuel de l'onglet Actifs (ligne ${row.line})`, "Vérifiez les loyers dans les deux onglets."),
         );
       }
     }
-    const assetUnits = units.filter((u) => u.values.asset_code === code);
-    const areas = assetUnits.map((u) => num(u.values.area_sqm ?? null));
-    const lettable = num(row.values.lettable_area_sqm ?? null);
+    const assetUnits = units.filter((u) => u.values["asset_code"] === code);
+    const areas = assetUnits.map((u) => num(u.values["area_sqm"] ?? null));
+    const lettable = num(row.values["lettable_area_sqm"] ?? null);
     if (lettable != null && assetUnits.length > 0 && areas.every((a) => a != null)) {
       if (!same(areas.reduce<number>((a, b) => a + (b ?? 0), 0), lettable)) {
         warnings.push(
           msg(SHEETS.units, null, "Surface (m²)", `pour l'actif ${code}, la somme des surfaces des lots est différente de la surface locative (onglet Actifs, ligne ${row.line})`, "Vérifiez les surfaces dans les deux onglets."),
         );
       }
-      const vacantArea = num(row.values.vacant_area_sqm ?? null);
+      const vacantArea = num(row.values["vacant_area_sqm"] ?? null);
       const vacantSum = assetUnits
-        .filter((u) => u.values.vacant_since != null)
-        .reduce<number>((a, u) => a + (num(u.values.area_sqm ?? null) ?? 0), 0);
+        .filter((u) => u.values["vacant_since"] != null)
+        .reduce<number>((a, u) => a + (num(u.values["area_sqm"] ?? null) ?? 0), 0);
       if (vacantArea != null && !same(vacantSum, vacantArea)) {
         warnings.push(
           msg(SHEETS.units, null, "Vacant depuis", `pour l'actif ${code}, la surface des lots vacants est différente de la surface vacante (onglet Actifs, ligne ${row.line})`, "Vérifiez les lots vacants et la surface vacante."),
@@ -524,16 +524,16 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
     }
   }
   for (const row of units) {
-    const key = `${str(row.values.asset_code ?? null)}\u0000${str(row.values.label ?? null)}`;
-    if (row.values.label && !leasedUnits.has(key) && row.values.vacant_since == null) {
+    const key = `${str(row.values["asset_code"] ?? null)}\u0000${str(row.values["label"] ?? null)}`;
+    if (row.values["label"] && !leasedUnits.has(key) && row.values["vacant_since"] == null) {
       warnings.push(
-        msg(SHEETS.units, row.line, "Vacant depuis", `le lot « ${str(row.values.label)} » n'a ni bail ni date « Vacant depuis »`, "Ajoutez un bail ou la date de vacance."),
+        msg(SHEETS.units, row.line, "Vacant depuis", `le lot « ${str(row.values["label"])} » n'a ni bail ni date « Vacant depuis »`, "Ajoutez un bail ou la date de vacance."),
       );
     }
   }
   for (const row of loans) {
     const ltv = num(row.values.ltv ?? null);
-    const covenant = num(row.values.ltv_covenant ?? null);
+    const covenant = num(row.values["ltv_covenant"] ?? null);
     if (ltv != null && covenant != null && ltv >= covenant - 5) {
       warnings.push(
         msg(SHEETS.loans, row.line, "LTV (%)", `la LTV (${ltv}) est supérieure ou égale au covenant moins 5 points (covenant ${covenant})`, "Vérifiez le financement de cet actif."),
@@ -549,7 +549,7 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
       }
     }
   }
-  const fileUnits = new Set(units.map((u) => `${str(u.values.asset_code ?? null)}\u0000${str(u.values.label ?? null)}`));
+  const fileUnits = new Set(units.map((u) => `${str(u.values["asset_code"] ?? null)}\u0000${str(u.values["label"] ?? null)}`));
   for (const unit of context.existingUnits) {
     if (assetCodes.has(unit.assetCode) && !fileUnits.has(`${unit.assetCode}\u0000${unit.label}`)) {
       warnings.push(
