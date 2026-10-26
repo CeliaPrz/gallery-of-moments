@@ -240,14 +240,16 @@ export function LurShell({
                           ) : null}
                           <AssetsMenu groups={assetGroups} currentPath={currentPath} onNavigate={closeMenu} />
                           {rest.map((item) => (
-                        <NavButton
-                          key={item.label}
-                          item={item}
-                          active={"to" in item && currentPath === item.to}
-                          onNavigate={closeMenu}
-                        />
-                      ))}
-                    </>
+                            <NavButton
+                              key={item.label}
+                              item={item}
+                              active={"to" in item && currentPath === item.to}
+                              onNavigate={closeMenu}
+                            />
+                          ))}
+                        </>
+                      );
+                    })()
                   ) : (
                     section.items.map((item) => (
                       <NavButton
@@ -263,20 +265,29 @@ export function LurShell({
             ))
           ) : (
             <div className="space-y-1">
-              <NavButton
-                item={INVESTOR_NAV[0]}
-                active={currentPath === "/"}
-                onNavigate={closeMenu}
-              />
-              <AssetsMenu groups={assetGroups} currentPath={currentPath} onNavigate={closeMenu} />
-              {INVESTOR_NAV.slice(1).map((item) => (
-                <NavButton
-                  key={item.label}
-                  item={item}
-                  active={false}
-                  onNavigate={closeMenu}
-                />
-              ))}
+              {(() => {
+                const [dashboardItem, ...rest] = INVESTOR_NAV;
+                return (
+                  <>
+                    {dashboardItem ? (
+                      <NavButton
+                        item={dashboardItem}
+                        active={currentPath === "/"}
+                        onNavigate={closeMenu}
+                      />
+                    ) : null}
+                    <AssetsMenu groups={assetGroups} currentPath={currentPath} onNavigate={closeMenu} />
+                    {rest.map((item) => (
+                      <NavButton
+                        key={item.label}
+                        item={item}
+                        active={false}
+                        onNavigate={closeMenu}
+                      />
+                    ))}
+                  </>
+                );
+              })()}
             </div>
           )}
         </nav>
