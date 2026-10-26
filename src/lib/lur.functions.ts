@@ -35,6 +35,7 @@ export type DashboardDto = {
   portfolioLtv: number | null;
   assetsCount: number | null;
   assets: DashboardAssetRow[];
+  exitedAssets: { assetId: string; name: string; exitDate: string | null; exitReason: string | null }[];
   alerts: DashboardAlert[];
   lastReport: { periodLabel: string; validatedAt: string | null; pdfPath: string | null } | null;
   lastImportAt: string | null;
@@ -136,7 +137,13 @@ export const getDashboard = createServerFn({ method: "GET" })
       .order("name");
     if (investorId) summaryQuery = summaryQuery.eq("investor_id", investorId);
     const { data: summaries } = await summaryQuery;
-    const rows = (summaries ?? []).filter((r) => r.asset_id && r.import_id);
+    // Actifs sortis : exclus de la liste, des alertes et du graphique (l'investisseur ne les reçoit pas).
+    let exitedQuery = supabase.from("assets").select("id, name, exit_date, exit_reason")
+      .eq("status", "sorti").order("name");
+    if (investorId) exitedQuery = exitedQuery.eq("investor_id", investorId);
+    const { data: exitedRows } = await exitedQuery;
+    const exitedIds = new Set((exitedRows ?? []).map((a) => a.id));
+    const rows = (summaries ?? []).filter((r) => r.asset_id && r.import_id && !exitedIds.has(r.asset_id));
 
     const assetIds = rows.map((r) => r.asset_id as string);
     const importIds = rows.map((r) => r.import_id as string);
@@ -237,6 +244,9 @@ export const getDashboard = createServerFn({ method: "GET" })
         asOfDate: row.as_of_date,
         nextEventDate: nextEventDate(eventDates.get(row.asset_id as string) ?? []),
       })),
+      exitedAssets: isAdmin ? (exitedRows ?? []).map((a) => ({
+        assetId: a.id, name: a.name, exitDate: a.exit_date, exitReason: a.exit_reason,
+      })) : [],
       alerts,
       lastReport: report
         ? { periodLabel: report.period_label, validatedAt: report.validated_at, pdfPath: report.pdf_path }
@@ -251,7 +261,7 @@ export const getAssetSheet = createServerFn({ method: "GET" })
   .handler(async ({ context, data: assetId }): Promise<AssetSheetDto> => {
     const supabase = context.supabase;
     const { data: asset, error: assetError } = await supabase.from("assets")
-      .select("id, name, code, asset_type, address, city, lettable_area_sqm, acquisition_date, strategy, investor_id, units_count, parking_spaces, year_built, year_renovated, cadastral_reference, description, photo_path, postal_code, created_at, updated_at")
+      .select("id, name, code, asset_type, address, city, lettable_area_sqm, acquisition_date, strategy, investor_id, units_count, parking_spaces, year_built, year_renovated, cadastral_reference, description, photo_path, postal_code, created_at, updated_at, status, exit_date, exit_reason")
       .eq("id", assetId).maybeSingle();
     if (assetError || !asset) throw new Error("Cet actif n'est pas disponible.");
 
@@ -275,7 +285,7 @@ export const getAssetSheet = createServerFn({ method: "GET" })
     // Even for admins, never read historical leases, loans, or BP versions into the sheet.
     const scopedImportId = hasData && importId ? importId : NO_ID;
     const [leaseResult, loanResult, bpResult] = hasData ? await Promise.all([
-      supabase.from("leases").select("*, tenant:tenants(name)").eq("asset_id", assetId)
+      supabase.from("leases").select("*, tenant:tenants(name, anonymized_at)").eq("asset_id", assetId)
         .eq("import_id", scopedImportId).eq("is_active", true).order("start_date", { ascending: false, nullsFirst: false }).order("id"),
       supabase.from("loans")
         .select("id, asset_id, import_id, lender, maturity_date, ltv, ltv_covenant, icr, icr_covenant, amortization_type, interest_rate, rate_type, reference_index, outstanding")
@@ -291,6 +301,23 @@ export const getAssetSheet = createServerFn({ method: "GET" })
       units: unitResult.data ?? [], leases: leaseResult.data ?? [], loans: loanResult.data ?? [],
       bpVersions: bpResult.data ?? [],
     });
+    const isAdmin = profileResult.data?.role === "admin";
+    // Contacts : administratrice uniquement, jamais chargés pour l'investisseur.
+    let tenantContacts: AssetSheetDto["tenantContacts"] = [];
+    const tenantIds = [...new Set((leaseResult.data ?? []).map((l) => l.tenant_id))];
+    if (isAdmin && tenantIds.length) {
+      const [{ data: tenants }, { data: contacts }] = await Promise.all([
+        supabase.from("tenants").select("id, name, anonymized_at").in("id", tenantIds).order("name"),
+        supabase.from("tenant_contacts").select("id, tenant_id, full_name, role_title, email, phone")
+          .in("tenant_id", tenantIds).order("full_name"),
+      ]);
+      tenantContacts = (tenants ?? []).map((t) => ({
+        tenantId: t.id, tenantName: t.name, anonymized: Boolean(t.anonymized_at),
+        contacts: (contacts ?? []).filter((c) => c.tenant_id === t.id).map((c) => ({
+          id: c.id, fullName: c.full_name, roleTitle: c.role_title, email: c.email, phone: c.phone,
+        })),
+      }));
+    }
     let photoUrl: string | null = null;
     if (asset.photo_path) {
       const { data: photo } = await supabase.storage.from("asset-photos").createSignedUrl(asset.photo_path, PHOTO_TTL_SECONDS);
@@ -300,13 +327,14 @@ export const getAssetSheet = createServerFn({ method: "GET" })
     }
     return {
       ...assembled,
-      fullName: profileResult.data?.full_name ?? "", isAdmin: profileResult.data?.role === "admin",
+      fullName: profileResult.data?.full_name ?? "", isAdmin, tenantContacts,
       asset: {
         id: asset.id, name: asset.name, code: asset.code, assetType: asset.asset_type,
         address: asset.address, city: asset.city, areaSqm: asset.lettable_area_sqm,
         acquisitionDate: asset.acquisition_date, strategy: asset.strategy, unitsCount: asset.units_count,
         parkingSpaces: asset.parking_spaces, yearBuilt: asset.year_built, yearRenovated: asset.year_renovated,
         cadastralReference: asset.cadastral_reference, description: asset.description,
+        status: asset.status, exitDate: asset.exit_date, exitReason: asset.exit_reason,
       },
       investor: { name: investorResult.data?.name ?? "", code: investorResult.data?.code ?? "" },
       photoUrl,
@@ -424,23 +452,23 @@ export const getImportContext = createServerFn({ method: "GET" })
     };
   });
 
-export type SidebarAssetGroup = { investorName: string | null; assets: { id: string; name: string }[] };
+export type SidebarAssetGroup = { investorName: string | null; assets: { id: string; name: string; exited?: boolean }[] };
 
 export const getSidebarAssets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const [{ data: profile }, { data: rows, error }] = await Promise.all([
       context.supabase.from("profiles").select("role").eq("id", context.userId).maybeSingle(),
-      context.supabase.from("assets").select("id, name, investor:investors(name)").order("name"),
+      context.supabase.from("assets").select("id, name, status, investor:investors(name)").order("name"),
     ]);
     if (error) throw new Error(error.message);
     const isAdmin = profile?.role === "admin";
     const list = (rows ?? []).map((r) => {
       const inv = (r as { investor?: { name: string | null } | { name: string | null }[] | null }).investor;
       const investorName = Array.isArray(inv) ? (inv[0]?.name ?? null) : (inv?.name ?? null);
-      return { id: r.id as string, name: (r.name as string) ?? "", investorName };
+      return { id: r.id as string, name: (r.name as string) ?? "", investorName, exited: r.status === "sorti" };
     });
-    list.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    list.sort((a, b) => Number(a.exited) - Number(b.exited) || a.name.localeCompare(b.name, "fr"));
     if (!isAdmin) {
       return { isAdmin, groups: [{ investorName: null, assets: list.map(({ id, name }) => ({ id, name })) }] as SidebarAssetGroup[] };
     }
@@ -448,7 +476,7 @@ export const getSidebarAssets = createServerFn({ method: "GET" })
     for (const a of list) {
       const key = a.investorName ?? "";
       if (!map.has(key)) map.set(key, { investorName: a.investorName, assets: [] });
-      map.get(key)!.assets.push({ id: a.id, name: a.name });
+      map.get(key)!.assets.push({ id: a.id, name: a.name, exited: a.exited });
     }
     const groups = [...map.values()].sort((a, b) => (a.investorName ?? "").localeCompare(b.investorName ?? "", "fr"));
     return { isAdmin, groups };

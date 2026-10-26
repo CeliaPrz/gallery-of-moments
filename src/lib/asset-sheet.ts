@@ -73,7 +73,12 @@ export type AssetSheetDto = {
     areaSqm: number; acquisitionDate: string | null; strategy: string | null;
     unitsCount: number | null; parkingSpaces: number | null; yearBuilt: number | null;
     yearRenovated: number | null; cadastralReference: string | null; description: string | null;
+    status: string; exitDate: string | null; exitReason: string | null;
   };
+  tenantContacts: {
+    tenantId: string; tenantName: string; anonymized: boolean;
+    contacts: { id: string; fullName: string; roleTitle: string | null; email: string | null; phone: string | null }[];
+  }[];
   photoUrl: string | null;
   investor: { name: string; code: string };
   hasData: boolean;
