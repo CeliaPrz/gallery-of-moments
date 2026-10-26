@@ -109,6 +109,7 @@ const STATUS_LABELS: Record<string, string> = {
 function ImportPage() {
   const { data: context } = useSuspenseQuery(importQueryOptions);
   const { data: me } = useSuspenseQuery(whoamiQueryOptions);
+  const sidebarAssets = useQuery(sidebarAssetsQueryOptions);
 
   const [investorId, setInvestorId] = useState(context.selectedInvestorId ?? "");
   const [file, setFile] = useState<File | null>(null);
@@ -183,6 +184,7 @@ function ImportPage() {
       investorName={me.investor?.name ?? ""}
       assetsCount={selectedInvestor?.assetsCount ?? null}
       lastImportLabel={context.lastImports[0] ? formatDate(context.lastImports[0].importedAt) : null}
+      assetGroups={sidebarAssets.data?.groups ?? []}
     >
       <main className="mx-auto max-w-[1200px] space-y-6 p-6 lg:p-8">
         <header className="flex flex-wrap items-start justify-between gap-4">
