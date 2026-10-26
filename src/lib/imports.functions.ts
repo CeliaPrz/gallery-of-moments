@@ -9,7 +9,6 @@ import {
   type Value,
 } from "@/lib/import-template";
 
-type Ctx = { supabase: Parameters<typeof assertAdmin>[0]; userId: string };
 
 async function assertAdmin(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -310,4 +309,3 @@ export const commitImport = createServerFn({ method: "POST" })
     }
   });
 
-export type { Ctx };
