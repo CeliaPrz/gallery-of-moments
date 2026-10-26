@@ -561,11 +561,6 @@ function ImportPage() {
                       <MaterialIcon name="file_download" className="text-[16px] text-surface-tint" />
                       {entry.fileName}
                     </p>
-                    {entry.notes ? (
-                      <p className="mt-1 font-audit-trail text-[11px] text-secondary">
-                        {entry.notes}
-                      </p>
-                    ) : null}
                   </li>
                 ))}
               </ul>
