@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 
 import { MaterialIcon } from "@/components/material-icon";
+import { AccountMenu } from "@/components/account-menu";
 import { LurShell } from "@/components/lur-shell";
 import { sidebarAssetsQueryOptions } from "@/lib/sidebar-assets";
 import { SourceRibbonBar } from "@/components/source-ribbon";
