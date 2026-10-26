@@ -422,3 +422,33 @@ export const getImportContext = createServerFn({ method: "GET" })
       },
     };
   });
+
+export type SidebarAssetGroup = { investorName: string | null; assets: { id: string; name: string }[] };
+
+export const getSidebarAssets = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [{ data: profile }, { data: rows, error }] = await Promise.all([
+      context.supabase.from("profiles").select("role").eq("id", context.userId).maybeSingle(),
+      context.supabase.from("assets").select("id, name, investor:investors(name)").order("name"),
+    ]);
+    if (error) throw new Error(error.message);
+    const isAdmin = profile?.role === "admin";
+    const list = (rows ?? []).map((r) => {
+      const inv = (r as { investor?: { name: string | null } | { name: string | null }[] | null }).investor;
+      const investorName = Array.isArray(inv) ? (inv[0]?.name ?? null) : (inv?.name ?? null);
+      return { id: r.id as string, name: (r.name as string) ?? "", investorName };
+    });
+    list.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    if (!isAdmin) {
+      return { isAdmin, groups: [{ investorName: null, assets: list.map(({ id, name }) => ({ id, name })) }] as SidebarAssetGroup[] };
+    }
+    const map = new Map<string, SidebarAssetGroup>();
+    for (const a of list) {
+      const key = a.investorName ?? "";
+      if (!map.has(key)) map.set(key, { investorName: a.investorName, assets: [] });
+      map.get(key)!.assets.push({ id: a.id, name: a.name });
+    }
+    const groups = [...map.values()].sort((a, b) => (a.investorName ?? "").localeCompare(b.investorName ?? "", "fr"));
+    return { isAdmin, groups };
+  });
