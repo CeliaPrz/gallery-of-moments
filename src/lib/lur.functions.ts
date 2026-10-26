@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildDashboardAlerts, nextEventDate, type DashboardAlert } from "./alerts";
 import { assembleAssetSheet, storageUrlForBrowser, type AssetSheetDto } from "./asset-sheet";
+import { DOCUMENT_DOWNLOAD_TTL_SECONDS, PHOTO_TTL_SECONDS } from "./storage-ttl";
 export type { AssetSheetDto, LeaseRowDto, SourceRibbon } from "./asset-sheet";
 
 
@@ -292,7 +293,7 @@ export const getAssetSheet = createServerFn({ method: "GET" })
     });
     let photoUrl: string | null = null;
     if (asset.photo_path) {
-      const { data: photo } = await supabase.storage.from("asset-photos").createSignedUrl(asset.photo_path, 3600);
+      const { data: photo } = await supabase.storage.from("asset-photos").createSignedUrl(asset.photo_path, PHOTO_TTL_SECONDS);
       if (photo?.signedUrl) photoUrl = storageUrlForBrowser(
         photo.signedUrl, process.env["SUPABASE_URL"], import.meta.env['VITE_SUPABASE_URL'],
       );
@@ -324,7 +325,7 @@ export const getDocumentDownload = createServerFn({ method: "POST" })
       .select("file_path, name").eq("id", data.documentId).eq("asset_id", data.assetId).maybeSingle();
     if (error || !document) throw new Error("Ce document n'est pas disponible.");
     const { data: signed, error: signingError } = await context.supabase.storage.from("documents")
-      .createSignedUrl(document.file_path, 60, { download: document.name });
+      .createSignedUrl(document.file_path, DOCUMENT_DOWNLOAD_TTL_SECONDS, { download: document.name });
     if (signingError || !signed?.signedUrl) throw new Error("Ce document n'est pas disponible.");
     return { url: storageUrlForBrowser(signed.signedUrl, process.env["SUPABASE_URL"], import.meta.env['VITE_SUPABASE_URL']) };
   });
