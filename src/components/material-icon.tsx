@@ -1,9 +1,9 @@
 import {
   AlertTriangle, ArrowRight, AtSign, BarChart3, Building, Building2, CalendarClock, Check,
-  CheckCircle2, ChevronDown, ChevronRight, CircleAlert, CircleX, Download, Eye, EyeOff, File,
+  CheckCircle2, ChevronDown, ChevronRight, CircleX, Download, Eye, EyeOff, File,
   FileDown, FileSpreadsheet, FileText, FileUp, FolderOpen, Hourglass, Info, Landmark,
   LayoutDashboard, LayoutGrid, LineChart, Lock, LogOut, MapPin, Menu, BellRing, Banknote,
-  BadgeCheck, ClipboardList, History, Exclamation, RefreshCw, ShieldCheck, Trash2, TrendingUp,
+  BadgeCheck, ClipboardList, History, CircleAlert as Exclamation2, RefreshCw, ShieldCheck, Trash2, TrendingUp,
   User, Users, X, type LucideIcon,
 } from "lucide-react";
 
@@ -43,7 +43,7 @@ const ICONS: Record<string, LucideIcon> = {
   notifications_active: BellRing,
   payments: Banknote,
   person: User,
-  priority_high: Exclamation,
+  priority_high: CircleAlert as Exclamation2,
   shield_lock: ShieldCheck,
   summarize: ClipboardList,
   sync: RefreshCw,
@@ -59,7 +59,7 @@ const ICONS: Record<string, LucideIcon> = {
 
 /** Lucide icon with a fixed pixel size (read from `text-[Npx]`, default 24) to avoid layout shift. */
 export function MaterialIcon({ name, className = "" }: { name: string; className?: string }) {
-  const Icon = ICONS[name] ?? (name ? File : CircleAlert);
+  const Icon = ICONS[name] ?? (File);
   const match = /text-\[(\d+)px\]/.exec(className);
   const size = match ? Number(match[1]) : 24;
   return (

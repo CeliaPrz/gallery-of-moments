@@ -8,13 +8,13 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Connexion — LUR Gestion d'actifs" },
+      { title: "LUR · Connexion" },
       {
         name: "description",
         content:
           "Portail institutionnel de gestion d'actifs immobiliers. Accès réservé aux investisseurs et à l'équipe de gestion.",
       },
-      { property: "og:title", content: "Connexion — LUR Gestion d'actifs" },
+      { property: "og:title", content: "LUR · Connexion" },
       {
         property: "og:description",
         content:

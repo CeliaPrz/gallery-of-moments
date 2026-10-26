@@ -12,6 +12,11 @@ import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 import appCss from "../styles.css?url";
+import inter400 from "@fontsource/inter/files/inter-latin-400-normal.woff2?url";
+import inter500 from "@fontsource/inter/files/inter-latin-500-normal.woff2?url";
+import inter600 from "@fontsource/inter/files/inter-latin-600-normal.woff2?url";
+import manrope600 from "@fontsource/manrope/files/manrope-latin-600-normal.woff2?url";
+import manrope700 from "@fontsource/manrope/files/manrope-latin-700-normal.woff2?url";
 
 function RootComponent() {
   const router = useRouter();
@@ -29,20 +34,12 @@ function RootComponent() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin={"anonymous"}
-        />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700&display=swap"
-        />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
-        />
+        <meta name="robots" content="noindex, nofollow" />
+        <link rel="preload" as="font" type="font/woff2" href={inter400} crossOrigin="anonymous" />
+        <link rel="preload" as="font" type="font/woff2" href={inter500} crossOrigin="anonymous" />
+        <link rel="preload" as="font" type="font/woff2" href={inter600} crossOrigin="anonymous" />
+        <link rel="preload" as="font" type="font/woff2" href={manrope600} crossOrigin="anonymous" />
+        <link rel="preload" as="font" type="font/woff2" href={manrope700} crossOrigin="anonymous" />
         <link
           rel="stylesheet"
           href={appCss}
