@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { MaterialIcon } from "@/components/material-icon";
 import { LurShell } from "@/components/lur-shell";
+import { sidebarAssetsQueryOptions } from "@/lib/sidebar-assets";
 import { SourceRibbonBar } from "@/components/source-ribbon";
 import {
   formatDate,
@@ -107,6 +108,7 @@ function SectionCard({
 function AssetSheetPage() {
   const { assetId } = Route.useParams();
   const { data } = useSuspenseQuery(assetQueryOptions(assetId));
+  const sidebarAssets = useQuery(sidebarAssetsQueryOptions);
   const [tab, setTab] = useState<TabId>("synthese");
 
   const loan = data.loan;
@@ -124,6 +126,7 @@ function AssetSheetPage() {
       investorName={data.investor.name}
       assetsCount={null}
       lastImportLabel={data.source ? formatDate(data.source.importedAt) : null}
+      assetGroups={sidebarAssets.data?.groups ?? []}
     >
       <main className="mx-auto max-w-[1200px] space-y-6 p-6 lg:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">

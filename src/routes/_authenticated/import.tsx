@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { MaterialIcon } from "@/components/material-icon";
 import { LurShell } from "@/components/lur-shell";
+import { sidebarAssetsQueryOptions } from "@/lib/sidebar-assets";
 import { formatDate, formatPercent } from "@/lib/format";
 import { getImportContext, whoami } from "@/lib/lur.functions";
 import { recordImport } from "@/lib/imports.functions";

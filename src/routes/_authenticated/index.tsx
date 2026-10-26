@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 
 import { MaterialIcon } from "@/components/material-icon";
 import { LurShell } from "@/components/lur-shell";
+import { sidebarAssetsQueryOptions } from "@/lib/sidebar-assets";
 import { SourceRibbonBar } from "@/components/source-ribbon";
 import {
   formatDate,
@@ -97,6 +98,7 @@ function KpiCard({ label, icon, value }: { label: string; icon: string; value: s
 
 function DashboardPage() {
   const { data } = useSuspenseQuery(dashboardQueryOptions);
+  const sidebarAssets = useQuery(sidebarAssetsQueryOptions);
   const firstName = data.fullName.trim().split(/\s+/)[0] ?? data.fullName;
   const maxRent = Math.max(...data.rentBars.map((bar) => bar.rent), 1);
 
@@ -107,6 +109,7 @@ function DashboardPage() {
       investorName={data.investorName}
       assetsCount={data.assetsCount}
       lastImportLabel={data.source ? formatDate(data.source.importedAt) : null}
+      assetGroups={sidebarAssets.data?.groups ?? []}
     >
       <header className="flex items-center justify-end gap-1 border-b border-outline-variant/40 bg-surface px-6 py-3">
         <button
