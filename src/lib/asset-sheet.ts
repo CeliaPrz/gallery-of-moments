@@ -14,6 +14,10 @@ export type LeaseRowDto = {
   lot: string;
   floor: string | null;
   tenantName: string | null;
+  leaseId: string | null;
+  tenantId: string | null;
+  tenantAnonymized: boolean;
+  actualEndDate: string | null;
   isVacant: boolean;
   areaSqm: number | null;
   annualRent: number | null;
@@ -92,7 +96,7 @@ export type AssetSheetInput = {
   summary: Tables<"asset_summary"> | null;
   currentImport: Tables<"imports"> | null;
   units: Tables<"units">[];
-  leases: (Tables<"leases"> & { tenant: { name: string } | null })[];
+  leases: (Tables<"leases"> & { tenant: { name: string; anonymized_at?: string | null } | null })[];
   loans: LoanInput[];
   bpVersions: Tables<"bp_versions">[];
 };
@@ -117,6 +121,8 @@ export function assembleAssetSheet(input: AssetSheetInput, now = new Date()) {
     const lease = currentLeases.find((l) => l.unit_id === unit.id);
     return {
       unitId: unit.id, lot: unit.label, floor: unit.floor, tenantName: lease?.tenant?.name ?? null,
+      leaseId: lease?.id ?? null, tenantId: lease?.tenant_id ?? null,
+      tenantAnonymized: Boolean(lease?.tenant?.anonymized_at), actualEndDate: lease?.actual_end_date ?? null,
       isVacant: !lease, areaSqm: unit.area_sqm, annualRent: lease?.annual_rent ?? null,
       endDate: lease?.end_date ?? null, breakDate: lease?.break_date ?? null,
       indexation: lease?.indexation ?? null, vacantSince: lease ? null : unit.vacant_since,
