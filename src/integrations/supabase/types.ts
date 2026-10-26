@@ -85,6 +85,8 @@ export type Database = {
           code: string
           created_at: string
           description: string | null
+          exit_date: string | null
+          exit_reason: Database["public"]["Enums"]["exit_reason"] | null
           id: string
           investor_id: string
           lettable_area_sqm: number
@@ -92,6 +94,7 @@ export type Database = {
           parking_spaces: number | null
           photo_path: string | null
           postal_code: string | null
+          status: Database["public"]["Enums"]["asset_status"]
           strategy: string | null
           units_count: number | null
           updated_at: string
@@ -107,6 +110,8 @@ export type Database = {
           code: string
           created_at?: string
           description?: string | null
+          exit_date?: string | null
+          exit_reason?: Database["public"]["Enums"]["exit_reason"] | null
           id?: string
           investor_id: string
           lettable_area_sqm: number
@@ -114,6 +119,7 @@ export type Database = {
           parking_spaces?: number | null
           photo_path?: string | null
           postal_code?: string | null
+          status?: Database["public"]["Enums"]["asset_status"]
           strategy?: string | null
           units_count?: number | null
           updated_at?: string
@@ -129,6 +135,8 @@ export type Database = {
           code?: string
           created_at?: string
           description?: string | null
+          exit_date?: string | null
+          exit_reason?: Database["public"]["Enums"]["exit_reason"] | null
           id?: string
           investor_id?: string
           lettable_area_sqm?: number
@@ -136,6 +144,7 @@ export type Database = {
           parking_spaces?: number | null
           photo_path?: string | null
           postal_code?: string | null
+          status?: Database["public"]["Enums"]["asset_status"]
           strategy?: string | null
           units_count?: number | null
           updated_at?: string
@@ -342,26 +351,36 @@ export type Database = {
           contact_name: string | null
           created_at: string
           id: string
+          mandate_end_date: string | null
           name: string
+          retention_agreement: string | null
+          retention_until: string | null
         }
         Insert: {
           code: string
           contact_name?: string | null
           created_at?: string
           id?: string
+          mandate_end_date?: string | null
           name: string
+          retention_agreement?: string | null
+          retention_until?: string | null
         }
         Update: {
           code?: string
           contact_name?: string | null
           created_at?: string
           id?: string
+          mandate_end_date?: string | null
           name?: string
+          retention_agreement?: string | null
+          retention_until?: string | null
         }
         Relationships: []
       }
       leases: {
         Row: {
+          actual_end_date: string | null
           annual_rent: number
           area_sqm: number | null
           asset_id: string
@@ -383,6 +402,7 @@ export type Database = {
           unit_id: string
         }
         Insert: {
+          actual_end_date?: string | null
           annual_rent: number
           area_sqm?: number | null
           asset_id: string
@@ -404,6 +424,7 @@ export type Database = {
           unit_id: string
         }
         Update: {
+          actual_end_date?: string | null
           annual_rent?: number
           area_sqm?: number | null
           asset_id?: string
@@ -541,23 +562,29 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          deactivated_at: string | null
           full_name: string
           id: string
           investor_id: string | null
+          is_active: boolean
           role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
           created_at?: string
+          deactivated_at?: string | null
           full_name: string
           id: string
           investor_id?: string | null
+          is_active?: boolean
           role?: Database["public"]["Enums"]["user_role"]
         }
         Update: {
           created_at?: string
+          deactivated_at?: string | null
           full_name?: string
           id?: string
           investor_id?: string | null
+          is_active?: boolean
           role?: Database["public"]["Enums"]["user_role"]
         }
         Relationships: [
@@ -573,39 +600,54 @@ export type Database = {
       reports: {
         Row: {
           commentary: string | null
+          corrected_at: string | null
+          correction_reason: string | null
           created_at: string
           id: string
           investor_id: string
           pdf_path: string | null
           period_end: string
           period_label: string
+          replaces_report_id: string | null
+          sent_at: string | null
           status: Database["public"]["Enums"]["report_status"]
           validated_at: string | null
           validated_by: string | null
+          version: number
         }
         Insert: {
           commentary?: string | null
+          corrected_at?: string | null
+          correction_reason?: string | null
           created_at?: string
           id?: string
           investor_id: string
           pdf_path?: string | null
           period_end: string
           period_label: string
+          replaces_report_id?: string | null
+          sent_at?: string | null
           status?: Database["public"]["Enums"]["report_status"]
           validated_at?: string | null
           validated_by?: string | null
+          version?: number
         }
         Update: {
           commentary?: string | null
+          corrected_at?: string | null
+          correction_reason?: string | null
           created_at?: string
           id?: string
           investor_id?: string
           pdf_path?: string | null
           period_end?: string
           period_label?: string
+          replaces_report_id?: string | null
+          sent_at?: string | null
           status?: Database["public"]["Enums"]["report_status"]
           validated_at?: string | null
           validated_by?: string | null
+          version?: number
         }
         Relationships: [
           {
@@ -613,6 +655,13 @@ export type Database = {
             columns: ["investor_id"]
             isOneToOne: false
             referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_replaces_report_id_fkey"
+            columns: ["replaces_report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
             referencedColumns: ["id"]
           },
           {
@@ -624,8 +673,47 @@ export type Database = {
           },
         ]
       }
+      tenant_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          phone: string | null
+          role_title: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          phone?: string | null
+          role_title?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          phone?: string | null
+          role_title?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_contacts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
+          anonymized_at: string | null
           id: string
           investor_id: string
           name: string
@@ -633,6 +721,7 @@ export type Database = {
           tax_id: string | null
         }
         Insert: {
+          anonymized_at?: string | null
           id?: string
           investor_id: string
           name: string
@@ -640,6 +729,7 @@ export type Database = {
           tax_id?: string | null
         }
         Update: {
+          anonymized_at?: string | null
           id?: string
           investor_id?: string
           name?: string
@@ -740,6 +830,7 @@ export type Database = {
           asset_id: string | null
           city: string | null
           code: string | null
+          exit_date: string | null
           import_id: string | null
           investor_id: string | null
           lettable_area_sqm: number | null
@@ -747,6 +838,7 @@ export type Database = {
           market_value: number | null
           name: string | null
           occupancy_rate: number | null
+          status: Database["public"]["Enums"]["asset_status"] | null
           total_debt: number | null
           vacant_area_sqm: number | null
           valuation_date: string | null
@@ -799,6 +891,8 @@ export type Database = {
       my_investor_id: { Args: never; Returns: string }
     }
     Enums: {
+      asset_status: "en_portefeuille" | "sorti"
+      exit_reason: "vente" | "fin_de_mandat"
       import_status: "en_attente" | "valide" | "remplace"
       report_status: "brouillon" | "valide" | "envoye"
       user_role: "admin" | "investor"
@@ -929,6 +1023,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      asset_status: ["en_portefeuille", "sorti"],
+      exit_reason: ["vente", "fin_de_mandat"],
       import_status: ["en_attente", "valide", "remplace"],
       report_status: ["brouillon", "valide", "envoye"],
       user_role: ["admin", "investor"],
