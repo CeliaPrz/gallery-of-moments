@@ -2,8 +2,10 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const signOut = vi.fn(async () => ({ error: null }));
-const navigate = vi.fn();
+const { signOut, navigate } = vi.hoisted(() => ({
+  signOut: vi.fn(async () => ({ error: null })),
+  navigate: vi.fn(),
+}));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { signOut } },
