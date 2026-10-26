@@ -8,3 +8,5 @@
 - [x] Fiche actif : données de l’import en vigueur, caractéristiques, lots et baux complets, prêts, versions et documents signés
 - [x] Vérifier les règles par tests et contrôler l’accès protégé dans l’aperçu
 - [ ] Vérifier la fiche avec de vraies données et les téléchargements — bloqué : aucune session disponible sur le Supabase externe
+- [x] Étape 4 : page Import fonctionnelle (lecture exceljs, contrôles v1.2, validation, derniers imports)
+- [ ] Tester un import réel connecté en administratrice — bloqué : aucune session disponible sur le Supabase externe

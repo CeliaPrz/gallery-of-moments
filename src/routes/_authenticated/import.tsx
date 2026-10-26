@@ -1,15 +1,47 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { queryOptions, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { MaterialIcon } from "@/components/material-icon";
 import { LurShell } from "@/components/lur-shell";
-import { formatDate, formatPercent } from "@/lib/format";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDate } from "@/lib/format";
 import { getImportContext, whoami } from "@/lib/lur.functions";
-import { recordImport } from "@/lib/imports.functions";
+import { commitImport, getImportInvestorContext } from "@/lib/imports.functions";
+import {
+  checkWorkbook,
+  MAX_FILE_BYTES,
+  readWorkbook,
+  TEMPLATE_VERSION,
+  type CheckResult,
+  type Value,
+} from "@/lib/import-template";
 
-const MAX_BYTES = 50 * 1024 * 1024;
+const investorContextOptions = (investorId: string) =>
+  queryOptions({
+    queryKey: ["import-investor", investorId],
+    queryFn: () => getImportInvestorContext({ data: { investorId } }),
+    enabled: Boolean(investorId),
+  });
+
+function formatCell(value: Value): string {
+  if (value == null || value === "") return "—";
+  if (typeof value === "number") return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 }).format(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return formatDate(value);
+  return value;
+}
+
+function stamp(date: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}-${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}`;
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  valide: "bg-secondary-container text-primary",
+  remplace: "bg-surface-container-high text-on-surface-variant",
+  en_attente: "bg-tertiary-fixed text-on-tertiary-fixed",
+};
 
 const importQueryOptions = queryOptions({
   queryKey: ["import-context"],
@@ -56,49 +88,6 @@ export const Route = createFileRoute("/_authenticated/import")({
   ),
 });
 
-type Sheet = { name: string; rows: (string | number | null)[][] };
-type DateError = { sheet: string; line: number; value: string };
-type Parsed = { sheets: Sheet[]; errors: DateError[] };
-
-function invalidDateCell(value: string): boolean {
-  const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!match) return false;
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  return date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day;
-}
-
-async function parseWorkbook(file: File): Promise<Parsed> {
-  const XLSX = await import("xlsx");
-  const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array", cellDates: true, dateNF: "dd/mm/yyyy" });
-
-  const sheets: Sheet[] = workbook.SheetNames.map((name) => {
-    const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(workbook.Sheets[name]!, {
-      header: 1,
-      blankrows: false,
-      defval: null,
-      raw: false,
-    });
-    return { name, rows };
-  });
-
-  const errors: DateError[] = [];
-  for (const sheet of sheets) {
-    sheet.rows.forEach((row, index) => {
-      for (const cell of row) {
-        if (typeof cell === "string" && invalidDateCell(cell)) {
-          errors.push({ sheet: sheet.name, line: index + 1, value: cell.trim() });
-        }
-      }
-    });
-  }
-
-  return { sheets, errors };
-}
-
 const STATUS_LABELS: Record<string, string> = {
   valide: "Validé",
   en_attente: "En attente",
@@ -109,71 +98,104 @@ function ImportPage() {
   const { data: context } = useSuspenseQuery(importQueryOptions);
   const { data: me } = useSuspenseQuery(whoamiQueryOptions);
 
+  const queryClient = useQueryClient();
   const [investorId, setInvestorId] = useState(context.selectedInvestorId ?? "");
-  const [file, setFile] = useState<File | null>(null);
-  const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [queue, setQueue] = useState<File[]>([]);
+  const [raw, setRaw] = useState<{ file: File; workbook: Awaited<ReturnType<typeof readWorkbook>> } | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ count: number; asOfDate: string; investorId: string } | null>(null);
   const [activeSheet, setActiveSheet] = useState(0);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedInvestor = context.investors.find((investor) => investor.id === investorId);
-  const covenantWarnings = context.preview.filter(
-    (asset) =>
-      asset.ltv != null &&
-      asset.ltvCovenant != null &&
-      asset.ltv >= asset.ltvCovenant * 0.9,
+  const investorContext = useQuery(investorContextOptions(investorId));
+  const file = queue[0] ?? null;
+
+  useEffect(() => {
+    if (!file) {
+      setRaw(null);
+      return;
+    }
+    let cancelled = false;
+    setParsing(true);
+    setRaw(null);
+    readWorkbook(file)
+      .then((workbook) => {
+        if (!cancelled) setRaw({ file, workbook });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        toast.error("Lecture impossible", { description: "Le classeur n'a pas pu être ouvert." });
+        setQueue((q) => q.slice(1));
+      })
+      .finally(() => {
+        if (!cancelled) setParsing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [file]);
+
+  const parsed: CheckResult | null = useMemo(
+    () => (raw && investorContext.data ? checkWorkbook(raw.workbook, investorContext.data.check) : null),
+    [raw, investorContext.data],
   );
 
-  async function acceptFile(next: File | undefined) {
-    if (!next) return;
-    if (!next.name.toLowerCase().endsWith(".xlsx")) {
-      toast.error("Format non accepté", { description: "Seuls les fichiers .xlsx sont admis." });
-      return;
+  function acceptFiles(list: FileList | File[] | null | undefined) {
+    const accepted: File[] = [];
+    for (const next of Array.from(list ?? [])) {
+      if (!next.name.toLowerCase().endsWith(".xlsx")) {
+        toast.error(`Format non accepté : ${next.name}`, { description: "Seuls les fichiers .xlsx sont admis." });
+        continue;
+      }
+      if (next.size > MAX_FILE_BYTES) {
+        toast.error(`Fichier trop volumineux : ${next.name}`, { description: "Taille maximale : 5 Mo." });
+        continue;
+      }
+      accepted.push(next);
     }
-    if (next.size > MAX_BYTES) {
-      toast.error("Fichier trop volumineux", { description: "Taille maximale : 50 Mo." });
-      return;
-    }
-    setFile(next);
-    setParsed(null);
-    setParsing(true);
-    try {
-      const result = await parseWorkbook(next);
-      setParsed(result);
+    if (accepted.length) {
+      setFailure(null);
+      setSuccess(null);
       setActiveSheet(0);
-    } catch {
-      toast.error("Lecture impossible", { description: "Le classeur n'a pas pu être ouvert." });
-    } finally {
-      setParsing(false);
+      setQueue((q) => [...q, ...accepted]);
     }
   }
 
+  function nextFile() {
+    setActiveSheet(0);
+    setQueue((q) => q.slice(1));
+  }
+
   async function validateImport() {
-    if (!file || !context.schemaVersion || !investorId) return;
+    if (!file || !parsed?.payload || !investorContext.data || !investorId) return;
+    setSaving(true);
+    setFailure(null);
+    const filePath = `${investorContext.data.check.investorCode}/${stamp(new Date())}_${file.name}`;
     try {
-      await recordImport({
-        data: {
-          investorId,
-          fileName: file.name,
-          templateVersion: context.schemaVersion,
-          asOfDate: new Date().toISOString().slice(0, 10),
-        },
+      const { error } = await supabase.storage.from("imports").upload(filePath, file, {
+        contentType: file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      toast.success("Import enregistré", {
-        description: "Statut : en attente de traitement.",
+      if (error) throw new Error(`Dépôt du fichier : ${error.message}`);
+      const result = await commitImport({
+        data: { investorId, fileName: file.name, filePath, payload: parsed.payload },
       });
-      setFile(null);
-      setParsed(null);
+      setSuccess({ count: result.assetsCount, asOfDate: result.asOfDate, investorId });
+      await queryClient.invalidateQueries();
+      nextFile();
     } catch (error) {
-      toast.error("Enregistrement impossible", {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      setFailure(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSaving(false);
     }
   }
 
   const blocked = (parsed?.errors.length ?? 0) > 0;
-  const sheet = parsed?.sheets[activeSheet];
+  const sheet = parsed?.preview[activeSheet];
+  const lastImports = investorContext.data?.lastImports ?? [];
 
   return (
     <LurShell
@@ -251,7 +273,7 @@ function ImportPage() {
             onDrop={(event) => {
               event.preventDefault();
               setDragging(false);
-              void acceptFile(event.dataTransfer.files?.[0]);
+              acceptFiles(event.dataTransfer.files);
             }}
             className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 text-center transition-colors ${
               dragging ? "border-primary bg-surface-container-low" : "border-outline-variant"
@@ -262,7 +284,7 @@ function ImportPage() {
               Déposez un ou plusieurs fichiers .xlsx au format du modèle standard
             </p>
             <p className="font-audit-trail text-[11px] text-secondary">
-              Fichiers acceptés : .xlsx uniquement (taille max 50 Mo)
+              Fichiers acceptés : .xlsx uniquement (taille max 5 Mo)
             </p>
             <button
               type="button"
@@ -276,8 +298,12 @@ function ImportPage() {
               ref={inputRef}
               type="file"
               accept=".xlsx"
+              multiple
               className="hidden"
-              onChange={(event) => void acceptFile(event.target.files?.[0])}
+              onChange={(event) => {
+                acceptFiles(event.target.files);
+                event.target.value = "";
+              }}
             />
           </div>
 
@@ -290,9 +316,9 @@ function ImportPage() {
                     {file.name}
                   </p>
                   <p className="font-audit-trail text-[11px] text-secondary">
-                    Fichier chargé · modèle {context.schemaVersion ?? "—"} ·{" "}
-                    {Math.round(file.size / 1024)} Ko
+                    Fichier chargé · modèle {TEMPLATE_VERSION} · {Math.round(file.size / 1024)} Ko
                     {parsing ? " · lecture…" : ""}
+                    {queue.length > 1 ? ` · ${queue.length - 1} fichier(s) en attente` : ""}
                   </p>
                 </div>
               </div>
@@ -300,7 +326,10 @@ function ImportPage() {
                 <button
                   type="button"
                   aria-label="Recharger le fichier"
-                  onClick={() => void acceptFile(file)}
+                  onClick={() => {
+                    const current = file;
+                    setQueue((q) => [new File([current], current.name, { type: current.type }), ...q.slice(1)]);
+                  }}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary hover:bg-surface-container-high"
                 >
                   <MaterialIcon name="sync" className="text-[18px]" />
@@ -308,16 +337,34 @@ function ImportPage() {
                 <button
                   type="button"
                   aria-label="Retirer le fichier"
-                  onClick={() => {
-                    setFile(null);
-                    setParsed(null);
-                  }}
+                  onClick={nextFile}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary hover:bg-surface-container-high"
                 >
                   <MaterialIcon name="delete" className="text-[18px]" />
                 </button>
               </div>
             </div>
+          )}
+
+          {success && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-outline-variant/60 bg-secondary-container p-4">
+              <p className="flex items-center gap-2 font-body-md text-[13px] font-semibold text-primary">
+                <MaterialIcon name="check_circle" className="text-[18px]" />
+                Import validé : {success.count} actifs mis à jour au {formatDate(success.asOfDate)}.
+              </p>
+              <Link
+                to="/"
+                search={{ investisseur: success.investorId }}
+                className="font-label-sm text-[11px] uppercase tracking-wider text-primary hover:underline"
+              >
+                Tableau de bord
+              </Link>
+            </div>
+          )}
+          {investorContext.isError && (
+            <p role="alert" className="mt-4 font-body-sm text-error">
+              {investorContext.error instanceof Error ? investorContext.error.message : String(investorContext.error)}
+            </p>
           )}
         </section>
 
@@ -335,12 +382,12 @@ function ImportPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="flex items-center gap-1.5 rounded-full bg-surface-container-high px-3 py-1 font-label-sm text-[10px] uppercase tracking-wider text-on-surface-variant">
                   <MaterialIcon name="check_circle" className="text-[14px]" />
-                  {parsed.sheets.length} onglets lus
+                  {parsed.sheetsRead} onglets lus
                 </span>
                 <span className="flex items-center gap-1.5 rounded-full bg-tertiary-fixed px-3 py-1 font-label-sm text-[10px] uppercase tracking-wider text-on-tertiary-fixed">
                   <MaterialIcon name="warning" className="text-[14px]" />
-                  {covenantWarnings.length} avertissement
-                  {covenantWarnings.length > 1 ? "s" : ""}
+                  {parsed.warnings.length} avertissement
+                  {parsed.warnings.length > 1 ? "s" : ""}
                 </span>
                 <span className="flex items-center gap-1.5 rounded-full bg-error-container px-3 py-1 font-label-sm text-[10px] uppercase tracking-wider text-on-error-container">
                   <MaterialIcon name="error" className="text-[14px]" />
@@ -361,41 +408,29 @@ function ImportPage() {
                     Erreur bloquante
                   </p>
                 </div>
-                <p className="mt-1 font-label-sm text-[11px] uppercase tracking-wider text-on-error-container">
-                  Code : ERR_DATE_OUT_OF_RANGE
-                </p>
-                <p className="mt-2 font-body-sm text-[12px] text-on-surface-variant">
-                  Onglet {error.sheet}, ligne {error.line} : la date « {error.value} » n'est pas
-                  valide. Corrigez la date dans le fichier puis déposez-le à nouveau.
-                </p>
+                <p className="mt-2 font-body-sm text-[12px] text-on-surface-variant">{error.text}</p>
               </div>
             ))}
 
-            {covenantWarnings.map((asset) => (
+            {parsed.warnings.map((warning, index) => (
               <div
-                key={asset.assetId}
+                key={`w-${index}`}
                 className="mb-3 rounded-lg border border-tertiary-fixed-dim/60 bg-tertiary-fixed/40 p-4"
               >
                 <div className="flex items-center gap-2">
                   <MaterialIcon name="priority_high" className="text-[16px] text-tertiary" />
                   <p className="font-body-md text-[13px] font-semibold text-on-tertiary-fixed">
-                    Avertissement de covenant
+                    Avertissement
                   </p>
                 </div>
-                <p className="mt-1 font-label-sm text-[11px] uppercase tracking-wider text-on-tertiary-fixed-variant">
-                  Règle de prudence financière
-                </p>
-                <p className="mt-2 font-body-sm text-[12px] text-on-surface-variant">
-                  La LTV de {asset.name} ({formatPercent(asset.ltv)}) approche le seuil de covenant (
-                  {formatPercent(asset.ltvCovenant)}).
-                </p>
+                <p className="mt-2 font-body-sm text-[12px] text-on-surface-variant">{warning.text}</p>
               </div>
             ))}
 
             <div className="mb-4 flex flex-wrap gap-1 border-b border-outline-variant/60">
-              {parsed.sheets.map((entry, index) => (
+              {parsed.preview.map((entry, index) => (
                 <button
-                  key={entry.name}
+                  key={entry.sheet}
                   type="button"
                   onClick={() => setActiveSheet(index)}
                   className={`border-b-2 px-3 py-2 font-body-md text-[13px] transition-colors ${
@@ -404,38 +439,46 @@ function ImportPage() {
                       : "border-transparent text-secondary hover:text-on-surface"
                   }`}
                 >
-                  {entry.name} ({Math.max(entry.rows.length - 1, 0)})
+                  {entry.sheet} ({entry.rows.length})
                 </button>
               ))}
             </div>
 
+            {sheet && sheet.rows.length === 0 && (
+              <p className="font-body-sm text-secondary">Aucune ligne dans cet onglet.</p>
+            )}
+            {failure && (
+              <p role="alert" className="mt-4 rounded-lg border border-error/30 bg-error-container/40 p-4 font-body-sm text-[12px] text-error">
+                {failure}
+              </p>
+            )}
             {sheet && sheet.rows.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-outline-variant/60">
-                      {(sheet.rows[0] ?? []).map((heading, index) => (
+                      {sheet.headers.map((heading, index) => (
                         <th
                           key={index}
                           className="whitespace-nowrap px-3 py-3 font-label-md text-[11px] uppercase tracking-wider text-secondary"
                         >
-                          {heading ?? ""}
+                          {heading}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {sheet.rows.slice(1, 11).map((row, rowIndex) => (
+                    {sheet.rows.map((row) => (
                       <tr
-                        key={rowIndex}
+                        key={row.line}
                         className="border-b border-outline-variant/40 last:border-0"
                       >
-                        {(sheet.rows[0] ?? []).map((_, cellIndex) => (
+                        {row.cells.map((cell, cellIndex) => (
                           <td
                             key={cellIndex}
                             className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface"
                           >
-                            {row[cellIndex] ?? ""}
+                            {formatCell(cell)}
                           </td>
                         ))}
                       </tr>
@@ -457,23 +500,21 @@ function ImportPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setFile(null);
-                    setParsed(null);
-                  }}
+                  disabled={saving}
+                  onClick={nextFile}
                   className="rounded-lg border border-outline-variant px-4 py-2 font-label-md text-[12px] uppercase tracking-wider text-secondary hover:bg-surface-container-high"
                 >
                   Annuler
                 </button>
                 <button
                   type="button"
-                  disabled={blocked || !file || parsing}
+                  disabled={blocked || !parsed?.payload || parsing || saving}
                   title={blocked ? "Corrigez l'erreur bloquante pour valider" : undefined}
                   onClick={() => void validateImport()}
                   className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 font-label-md text-[12px] uppercase tracking-wider text-on-primary hover:bg-primary-container disabled:cursor-not-allowed disabled:bg-surface-container-high disabled:text-outline"
                 >
                   <MaterialIcon name="check" className="text-[18px]" />
-                  Valider l'import
+                  {saving ? "Validation…" : "Valider l'import"}
                 </button>
               </div>
             </div>
@@ -497,11 +538,13 @@ function ImportPage() {
               </button>
             </div>
 
-            {context.lastImports.length === 0 ? (
+            {investorContext.isPending ? (
+              <div className="h-24 animate-pulse rounded-lg bg-surface-container-high" />
+            ) : lastImports.length === 0 ? (
               <p className="font-body-sm text-secondary">Aucun import enregistré.</p>
             ) : (
               <ul className="space-y-3">
-                {context.lastImports.map((entry) => (
+                {lastImports.map((entry) => (
                   <li
                     key={entry.id}
                     className="rounded-lg border border-outline-variant/40 bg-surface p-4"
@@ -510,7 +553,7 @@ function ImportPage() {
                       <p className="font-body-sm text-secondary">
                         {formatDate(entry.importedAt)} · {entry.templateVersion}
                       </p>
-                      <span className="rounded-full bg-surface-container-high px-2 py-0.5 font-label-sm text-[10px] uppercase tracking-wider text-on-surface-variant">
+                      <span className={`rounded-full px-2 py-0.5 font-label-sm text-[10px] uppercase tracking-wider ${STATUS_STYLES[entry.status] ?? "bg-surface-container-high text-on-surface-variant"}`}>
                         {STATUS_LABELS[entry.status] ?? entry.status}
                       </span>
                     </div>
@@ -518,11 +561,6 @@ function ImportPage() {
                       <MaterialIcon name="file_download" className="text-[16px] text-surface-tint" />
                       {entry.fileName}
                     </p>
-                    {entry.notes ? (
-                      <p className="mt-1 font-audit-trail text-[11px] text-secondary">
-                        {entry.notes}
-                      </p>
-                    ) : null}
                   </li>
                 ))}
               </ul>
