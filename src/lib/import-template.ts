@@ -532,7 +532,7 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
     }
   }
   for (const row of loans) {
-    const ltv = num(row.values.ltv ?? null);
+    const ltv = num(row.values["ltv"] ?? null);
     const covenant = num(row.values["ltv_covenant"] ?? null);
     if (ltv != null && covenant != null && ltv >= covenant - 5) {
       warnings.push(

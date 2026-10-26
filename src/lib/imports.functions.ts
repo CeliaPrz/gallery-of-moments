@@ -129,7 +129,7 @@ export const commitImport = createServerFn({ method: "POST" })
 
     try {
       // 3. Actifs : création, ou complément des seuls champs vides.
-      const codes = p.assets.map((a) => String(a.code));
+      const codes = p.assets.map((a) => String(a["code"]));
       const { data: existing, error: e1 } = await supabase
         .from("assets")
         .select("*")
@@ -156,7 +156,7 @@ export const commitImport = createServerFn({ method: "POST" })
             if ((found as Record<string, unknown>)[f] == null && row[f] != null) patch[f] = row[f]!;
           }
           if (Object.keys(patch).length) {
-            const { error } = await supabase.from("assets").update(patch).eq("id", found.id);
+            const { error } = await supabase.from("assets").update(patch as never).eq("id", found.id);
             fail(`Complément de l'actif ${code}`, error);
           }
         }
@@ -173,7 +173,7 @@ export const commitImport = createServerFn({ method: "POST" })
         const fields = pick(row, ["floor", "area_sqm", "use_type", "vacant_since"]);
         const id = unitId.get(key);
         if (id) {
-          const { error } = await supabase.from("units").update(fields).eq("id", id);
+          const { error } = await supabase.from("units").update(fields as never).eq("id", id);
           fail(`Mise à jour du lot ${String(row["label"])}`, error);
         } else {
           const { data: inserted, error } = await supabase
@@ -205,7 +205,7 @@ export const commitImport = createServerFn({ method: "POST" })
           if (!found.sector && row["sector"]) patch["sector"] = row["sector"];
           if (!found.tax_id && row["tax_id"]) patch["tax_id"] = row["tax_id"];
           if (Object.keys(patch).length) {
-            const { error } = await supabase.from("tenants").update(patch).eq("id", found.id);
+            const { error } = await supabase.from("tenants").update(patch as never).eq("id", found.id);
             fail(`Complément du locataire ${name}`, error);
           }
         } else {
