@@ -1,18 +1,15 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { MaterialIcon } from "@/components/material-icon";
 import { supabase } from "@/integrations/supabase/client";
+import type { SidebarAssetGroup } from "@/lib/lur.functions";
 
-type NavItem =
-  | { label: string; icon: string; to: "/" | "/import" }
-  | { label: string; icon: string; anchor: "#actifs" }
-  | { label: string; icon: string };
+type NavItem = { label: string; icon: string; to: "/" | "/import" } | { label: string; icon: string };
 
 const INVESTOR_NAV: NavItem[] = [
   { label: "Tableau de bord", icon: "grid_view", to: "/" },
-  { label: "Actifs", icon: "apartment", anchor: "#actifs" },
   { label: "Rapports", icon: "analytics" },
   { label: "Documents", icon: "folder_open" },
 ];
@@ -22,7 +19,6 @@ const ADMIN_NAV: { group: string; items: NavItem[] }[] = [
     group: "Portefeuille",
     items: [
       { label: "Tableau de bord", icon: "dashboard", to: "/" },
-      { label: "Actifs", icon: "domain", anchor: "#actifs" },
       { label: "Rapports", icon: "bar_chart" },
       { label: "Documents", icon: "folder_open" },
     ],
@@ -53,15 +49,6 @@ function NavButton({
       : "text-sidebar-foreground/80 hover:bg-surface-container-lowest/10 hover:text-sidebar-foreground"
   }`;
 
-  if ("anchor" in item) {
-    return (
-      <a href={item.anchor} className={classes} onClick={onNavigate}>
-        <MaterialIcon name={item.icon} className="text-[20px]" />
-        <span>{item.label}</span>
-      </a>
-    );
-  }
-
   if ("to" in item) {
     return (
       <Link to={item.to} className={classes} onClick={onNavigate}>
@@ -79,6 +66,81 @@ function NavButton({
   );
 }
 
+function AssetsMenu({
+  groups,
+  currentPath,
+  onNavigate,
+}: {
+  groups: SidebarAssetGroup[];
+  currentPath: string;
+  onNavigate: () => void;
+}) {
+  const onAssetPage = currentPath.startsWith("/actifs/");
+  const [open, setOpen] = useState(onAssetPage);
+
+  useEffect(() => {
+    if (onAssetPage) setOpen(true);
+  }, [onAssetPage]);
+
+  const totalAssets = groups.reduce((count, group) => count + group.assets.length, 0);
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 font-body-md text-[13px] text-sidebar-foreground/80 transition-colors hover:bg-surface-container-lowest/10 hover:text-sidebar-foreground"
+      >
+        <MaterialIcon name="apartment" className="text-[20px]" />
+        <span className="flex-1 text-left">Actifs</span>
+        <MaterialIcon
+          name="expand_more"
+          className={`text-[18px] transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="mt-1 max-h-64 overflow-y-auto">
+          {totalAssets === 0 ? (
+            <p className="px-3 py-2 pl-11 font-body-md text-[12px] text-sidebar-foreground/50">
+              Aucun actif
+            </p>
+          ) : (
+            groups.map((group, index) => (
+              <div key={group.investorName ?? `group-${index}`}>
+                {group.investorName != null && (
+                  <p className="px-3 pb-1 pt-2 pl-11 font-label-sm text-[10px] uppercase tracking-[0.15em] text-sidebar-foreground/50">
+                    {group.investorName}
+                  </p>
+                )}
+                {group.assets.map((asset) => {
+                  const active = currentPath === `/actifs/${asset.id}`;
+                  return (
+                    <Link
+                      key={asset.id}
+                      to="/actifs/$assetId"
+                      params={{ assetId: asset.id }}
+                      onClick={onNavigate}
+                      className={`block truncate rounded-lg py-1.5 pl-11 pr-3 font-body-md text-[12px] transition-colors ${
+                        active
+                          ? "bg-secondary-fixed text-on-secondary-fixed"
+                          : "text-sidebar-foreground/80 hover:bg-[#DCE5DA]/10 hover:text-sidebar-foreground"
+                      }`}
+                    >
+                      {asset.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function LurShell({
   children,
   isAdmin,
@@ -86,6 +148,7 @@ export function LurShell({
   investorName,
   assetsCount,
   lastImportLabel,
+  assetGroups,
 }: {
   children: ReactNode;
   isAdmin: boolean;
@@ -93,6 +156,7 @@ export function LurShell({
   investorName: string;
   assetsCount: number | null;
   lastImportLabel: string | null;
+  assetGroups: SidebarAssetGroup[];
 }) {
   const [open, setOpen] = useState(false);
   const currentPath = useRouterState({ select: (router) => router.location.pathname });
@@ -113,6 +177,7 @@ export function LurShell({
     .join("")
     .toUpperCase();
 
+  const closeMenu = () => setOpen(false);
 
   return (
     <div className="min-h-screen bg-surface">
@@ -161,25 +226,50 @@ export function LurShell({
                   {section.group}
                 </p>
                 <div className="space-y-1">
-                  {section.items.map((item) => (
-                    <NavButton
-                      key={item.label}
-                      item={item}
-                      active={"to" in item && currentPath === item.to}
-                      onNavigate={() => setOpen(false)}
-                    />
-                  ))}
+                  {section.group === "Portefeuille" ? (
+                    <>
+                      <NavButton
+                        item={section.items[0]}
+                        active={"to" in section.items[0] && currentPath === section.items[0].to}
+                        onNavigate={closeMenu}
+                      />
+                      <AssetsMenu groups={assetGroups} currentPath={currentPath} onNavigate={closeMenu} />
+                      {section.items.slice(1).map((item) => (
+                        <NavButton
+                          key={item.label}
+                          item={item}
+                          active={"to" in item && currentPath === item.to}
+                          onNavigate={closeMenu}
+                        />
+                      ))}
+                    </>
+                  ) : (
+                    section.items.map((item) => (
+                      <NavButton
+                        key={item.label}
+                        item={item}
+                        active={"to" in item && currentPath === item.to}
+                        onNavigate={closeMenu}
+                      />
+                    ))
+                  )}
                 </div>
               </div>
             ))
           ) : (
             <div className="space-y-1">
-              {INVESTOR_NAV.map((item) => (
+              <NavButton
+                item={INVESTOR_NAV[0]}
+                active={currentPath === "/"}
+                onNavigate={closeMenu}
+              />
+              <AssetsMenu groups={assetGroups} currentPath={currentPath} onNavigate={closeMenu} />
+              {INVESTOR_NAV.slice(1).map((item) => (
                 <NavButton
                   key={item.label}
                   item={item}
-                  active={"to" in item && currentPath === item.to}
-                  onNavigate={() => setOpen(false)}
+                  active={false}
+                  onNavigate={closeMenu}
                 />
               ))}
             </div>
@@ -238,4 +328,3 @@ export function LurShell({
     </div>
   );
 }
-
