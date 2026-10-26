@@ -16,12 +16,14 @@ const fixture = (): AssetSheetInput => ({
     strategy: null, units_count: 2, parking_spaces: 0, year_built: null, year_renovated: null,
     cadastral_reference: null, description: null, photo_path: null, postal_code: null,
     created_at: "2026-01-01", updated_at: "2026-01-01",
+    status: "en_portefeuille", exit_date: null, exit_reason: null,
   },
   summary: {
     asset_id: "a", import_id: "current", investor_id: "investor", code: "A", name: "Actif test",
     city: "Ville test", lettable_area_sqm: 300, as_of_date: "2026-10-01", market_value: 1250000,
     annual_rent: 90000, occupancy_rate: 70, ltv: 50, total_debt: 625000, vacant_area_sqm: 100,
     valuation_date: "2026-09-01", walb_years: null, walt_years: null,
+    status: "en_portefeuille", exit_date: null,
   },
   currentImport: {
     id: "current", investor_id: "investor", file_name: "current.xlsx", template_version: "v3",
@@ -37,7 +39,7 @@ const fixture = (): AssetSheetInput => ({
     start_date: "2025-01-01", end_date: "2027-10-01", break_date: "2027-03-01", annual_rent: 90000,
     indexation: "ILC", area_sqm: 195, is_active: true, parking_spaces: 0,
     rent_free_months: 3, rent_free_end_date: "2025-04-01", security_deposit: 7500,
-    bank_guarantee_amount: 15000, bank_guarantee_expiry: "2027-12-31", recoverable_charges: 4000,
+    bank_guarantee_amount: 15000, bank_guarantee_expiry: "2027-12-31", recoverable_charges: 4000, actual_end_date: null,
     tenant: { name: "Locataire test" },
   }],
   loans: [{
