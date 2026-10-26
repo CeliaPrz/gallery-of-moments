@@ -1,9 +1,82 @@
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { MaterialIcon } from "@/components/material-icon";
 import { supabase } from "@/integrations/supabase/client";
+import { getSidebarAssets, type SidebarAssetGroup } from "@/lib/lur.functions";
+
+function AssetsMenu({
+  item,
+  groups,
+  showGroups,
+  currentPath,
+  onNavigate,
+}: {
+  item: NavItem;
+  groups: SidebarAssetGroup[];
+  showGroups: boolean;
+  currentPath: string;
+  onNavigate: () => void;
+}) {
+  const onAssetPage = currentPath.startsWith("/actifs/");
+  const [open, setOpen] = useState(onAssetPage);
+  const isOpen = open || onAssetPage;
+  const total = groups.reduce((n, g) => n + g.assets.length, 0);
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        onClick={() => setOpen((v) => (onAssetPage ? true : !v))}
+        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 font-body-md text-[13px] text-sidebar-foreground/80 transition-colors hover:bg-surface-container-lowest/10 hover:text-sidebar-foreground"
+      >
+        <MaterialIcon name={item.icon} className="text-[20px]" />
+        <span className="flex-1 text-left">{item.label}</span>
+        <MaterialIcon
+          name="expand_more"
+          className={`text-[18px] transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+      {isOpen && (
+        <div className="mt-1 max-h-64 space-y-0.5 overflow-y-auto">
+          {total === 0 ? (
+            <p className="py-1.5 pl-11 font-body-sm text-[12px] text-on-primary-container">Aucun actif</p>
+          ) : (
+            groups.map((group) => (
+              <div key={group.investorName ?? "_"}>
+                {showGroups && group.investorName && (
+                  <p className="pb-1 pl-11 pt-2 font-label-sm text-[10px] uppercase tracking-wider text-on-primary-container">
+                    {group.investorName}
+                  </p>
+                )}
+                {group.assets.map((asset) => {
+                  const active = currentPath === `/actifs/${asset.id}`;
+                  return (
+                    <Link
+                      key={asset.id}
+                      to="/actifs/$assetId"
+                      params={{ assetId: asset.id }}
+                      onClick={onNavigate}
+                      className={`block truncate rounded-lg py-1.5 pl-11 pr-3 font-body-sm text-[12px] transition-colors ${
+                        active
+                          ? "bg-secondary-fixed text-on-secondary-fixed"
+                          : "text-on-primary/80 hover:bg-[#DCE5DA]/10"
+                      }`}
+                    >
+                      {asset.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type NavItem =
   | { label: string; icon: string; to: "/" | "/import" }
@@ -98,6 +171,30 @@ export function LurShell({
   const currentPath = useRouterState({ select: (router) => router.location.pathname });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const sidebarAssets = useQuery({
+    queryKey: ["sidebar-assets"],
+    queryFn: () => getSidebarAssets(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const assetGroups = sidebarAssets.data?.groups ?? [];
+  const renderItem = (item: NavItem) =>
+    "anchor" in item ? (
+      <AssetsMenu
+        key={item.label}
+        item={item}
+        groups={assetGroups}
+        showGroups={isAdmin}
+        currentPath={currentPath}
+        onNavigate={() => setOpen(false)}
+      />
+    ) : (
+      <NavButton
+        key={item.label}
+        item={item}
+        active={"to" in item && currentPath === item.to}
+        onNavigate={() => setOpen(false)}
+      />
+    );
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -161,27 +258,13 @@ export function LurShell({
                   {section.group}
                 </p>
                 <div className="space-y-1">
-                  {section.items.map((item) => (
-                    <NavButton
-                      key={item.label}
-                      item={item}
-                      active={"to" in item && currentPath === item.to}
-                      onNavigate={() => setOpen(false)}
-                    />
-                  ))}
+                  {section.items.map(renderItem)}
                 </div>
               </div>
             ))
           ) : (
             <div className="space-y-1">
-              {INVESTOR_NAV.map((item) => (
-                <NavButton
-                  key={item.label}
-                  item={item}
-                  active={"to" in item && currentPath === item.to}
-                  onNavigate={() => setOpen(false)}
-                />
-              ))}
+              {INVESTOR_NAV.map(renderItem)}
             </div>
           )}
         </nav>
