@@ -41,7 +41,7 @@ export const restoreAsset = createServerFn({ method: "POST" })
   });
 
 type ContactInput = {
-  id?: string; tenantId: string; fullName: string;
+  id?: string | undefined; tenantId: string; fullName: string;
   roleTitle: string | null; email: string | null; phone: string | null;
 };
 
