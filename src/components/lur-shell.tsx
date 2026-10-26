@@ -227,14 +227,19 @@ export function LurShell({
                 </p>
                 <div className="space-y-1">
                   {section.group === "Portefeuille" ? (
-                    <>
-                      <NavButton
-                        item={section.items[0]}
-                        active={"to" in section.items[0] && currentPath === section.items[0].to}
-                        onNavigate={closeMenu}
-                      />
-                      <AssetsMenu groups={assetGroups} currentPath={currentPath} onNavigate={closeMenu} />
-                      {section.items.slice(1).map((item) => (
+                    (() => {
+                      const [dashboardItem, ...rest] = section.items;
+                      return (
+                        <>
+                          {dashboardItem ? (
+                            <NavButton
+                              item={dashboardItem}
+                              active={"to" in dashboardItem && currentPath === dashboardItem.to}
+                              onNavigate={closeMenu}
+                            />
+                          ) : null}
+                          <AssetsMenu groups={assetGroups} currentPath={currentPath} onNavigate={closeMenu} />
+                          {rest.map((item) => (
                         <NavButton
                           key={item.label}
                           item={item}
