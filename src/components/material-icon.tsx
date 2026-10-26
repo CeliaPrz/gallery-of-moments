@@ -3,7 +3,7 @@ import {
   CheckCircle2, ChevronDown, ChevronRight, CircleX, Download, Eye, EyeOff, File,
   FileDown, FileSpreadsheet, FileText, FileUp, FolderOpen, Hourglass, Info, Landmark,
   LayoutDashboard, LayoutGrid, LineChart, Lock, LogOut, MapPin, Menu, BellRing, Banknote,
-  BadgeCheck, ClipboardList, History, CircleAlert as Exclamation2, RefreshCw, ShieldCheck, Trash2, TrendingUp,
+  BadgeCheck, ClipboardList, History, CircleAlert, RefreshCw, ShieldCheck, Trash2, TrendingUp,
   User, Users, X, type LucideIcon,
 } from "lucide-react";
 
@@ -43,7 +43,7 @@ const ICONS: Record<string, LucideIcon> = {
   notifications_active: BellRing,
   payments: Banknote,
   person: User,
-  priority_high: CircleAlert as Exclamation2,
+  priority_high: CircleAlert,
   shield_lock: ShieldCheck,
   summarize: ClipboardList,
   sync: RefreshCw,
