@@ -1,15 +1,47 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { queryOptions, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { MaterialIcon } from "@/components/material-icon";
 import { LurShell } from "@/components/lur-shell";
-import { formatDate, formatPercent } from "@/lib/format";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDate } from "@/lib/format";
 import { getImportContext, whoami } from "@/lib/lur.functions";
-import { recordImport } from "@/lib/imports.functions";
+import { commitImport, getImportInvestorContext } from "@/lib/imports.functions";
+import {
+  checkWorkbook,
+  MAX_FILE_BYTES,
+  readWorkbook,
+  TEMPLATE_VERSION,
+  type CheckResult,
+  type Value,
+} from "@/lib/import-template";
 
-const MAX_BYTES = 50 * 1024 * 1024;
+const investorContextOptions = (investorId: string) =>
+  queryOptions({
+    queryKey: ["import-investor", investorId],
+    queryFn: () => getImportInvestorContext({ data: { investorId } }),
+    enabled: Boolean(investorId),
+  });
+
+function formatCell(value: Value): string {
+  if (value == null || value === "") return "—";
+  if (typeof value === "number") return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 }).format(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return formatDate(value);
+  return value;
+}
+
+function stamp(date: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}-${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}`;
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  valide: "bg-secondary-container text-primary",
+  remplace: "bg-surface-container-high text-on-surface-variant",
+  en_attente: "bg-tertiary-fixed text-on-tertiary-fixed",
+};
 
 const importQueryOptions = queryOptions({
   queryKey: ["import-context"],
@@ -55,49 +87,6 @@ export const Route = createFileRoute("/_authenticated/import")({
     <div className="p-8 font-body-md text-secondary">Page d'import indisponible.</div>
   ),
 });
-
-type Sheet = { name: string; rows: (string | number | null)[][] };
-type DateError = { sheet: string; line: number; value: string };
-type Parsed = { sheets: Sheet[]; errors: DateError[] };
-
-function invalidDateCell(value: string): boolean {
-  const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!match) return false;
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  return date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day;
-}
-
-async function parseWorkbook(file: File): Promise<Parsed> {
-  const XLSX = await import("xlsx");
-  const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array", cellDates: true, dateNF: "dd/mm/yyyy" });
-
-  const sheets: Sheet[] = workbook.SheetNames.map((name) => {
-    const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(workbook.Sheets[name]!, {
-      header: 1,
-      blankrows: false,
-      defval: null,
-      raw: false,
-    });
-    return { name, rows };
-  });
-
-  const errors: DateError[] = [];
-  for (const sheet of sheets) {
-    sheet.rows.forEach((row, index) => {
-      for (const cell of row) {
-        if (typeof cell === "string" && invalidDateCell(cell)) {
-          errors.push({ sheet: sheet.name, line: index + 1, value: cell.trim() });
-        }
-      }
-    });
-  }
-
-  return { sheets, errors };
-}
 
 const STATUS_LABELS: Record<string, string> = {
   valide: "Validé",
