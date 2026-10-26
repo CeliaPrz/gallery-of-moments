@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { MaterialIcon } from "@/components/material-icon";
 import { LurShell } from "@/components/lur-shell";
+import { sidebarAssetsQueryOptions } from "@/lib/sidebar-assets";
 import { formatDate, formatPercent } from "@/lib/format";
 import { getImportContext, whoami } from "@/lib/lur.functions";
 import { recordImport } from "@/lib/imports.functions";
@@ -108,6 +109,7 @@ const STATUS_LABELS: Record<string, string> = {
 function ImportPage() {
   const { data: context } = useSuspenseQuery(importQueryOptions);
   const { data: me } = useSuspenseQuery(whoamiQueryOptions);
+  const sidebarAssets = useQuery(sidebarAssetsQueryOptions);
 
   const [investorId, setInvestorId] = useState(context.selectedInvestorId ?? "");
   const [file, setFile] = useState<File | null>(null);
@@ -182,6 +184,7 @@ function ImportPage() {
       investorName={me.investor?.name ?? ""}
       assetsCount={selectedInvestor?.assetsCount ?? null}
       lastImportLabel={context.lastImports[0] ? formatDate(context.lastImports[0].importedAt) : null}
+      assetGroups={sidebarAssets.data?.groups ?? []}
     >
       <main className="mx-auto max-w-[1200px] space-y-6 p-6 lg:p-8">
         <header className="flex flex-wrap items-start justify-between gap-4">

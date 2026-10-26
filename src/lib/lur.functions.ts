@@ -605,3 +605,39 @@ export const getImportContext = createServerFn({ method: "GET" })
       },
     };
   });
+
+export type SidebarAssetGroup = {
+  investorName: string | null;
+  assets: { id: string; name: string }[];
+};
+
+/** Assets readable by the connected user (RLS applies), for the sidebar dropdown. */
+export const getSidebarAssets = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ isAdmin: boolean; groups: SidebarAssetGroup[] }> => {
+    const supabase = context.supabase;
+    const [profileResult, assetResult] = await Promise.all([
+      supabase.from("profiles").select("role").eq("id", context.userId).maybeSingle(),
+      supabase
+        .from("assets")
+        .select("id, name, investor_id, investor:investors(name)")
+        .order("name"),
+    ]);
+    if (assetResult.error) throw new Error("La liste des actifs n'est pas disponible pour le moment.");
+    const isAdmin = profileResult.data?.role === "admin";
+    const byInvestor = new Map<string, SidebarAssetGroup>();
+    for (const asset of assetResult.data ?? []) {
+      const investorName = isAdmin ? ((asset.investor as { name: string } | null)?.name ?? "") : null;
+      const key = investorName ?? "";
+      let group = byInvestor.get(key);
+      if (!group) {
+        group = { investorName, assets: [] };
+        byInvestor.set(key, group);
+      }
+      group.assets.push({ id: asset.id, name: asset.name });
+    }
+    const groups = [...byInvestor.values()].sort((a, b) =>
+      (a.investorName ?? "").localeCompare(b.investorName ?? "", "fr"),
+    );
+    return { isAdmin, groups };
+  });
