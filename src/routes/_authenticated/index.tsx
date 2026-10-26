@@ -114,13 +114,6 @@ function DashboardPage() {
       <header className="flex items-center justify-end gap-1 border-b border-outline-variant/40 bg-surface px-6 py-3">
         <button
           type="button"
-          aria-label="Rechercher"
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary hover:bg-surface-container-high"
-        >
-          <MaterialIcon name="search" className="text-[20px]" />
-        </button>
-        <button
-          type="button"
           aria-label="Compte"
           className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary hover:bg-surface-container-high"
         >
