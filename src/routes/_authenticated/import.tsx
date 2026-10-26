@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { MaterialIcon } from "@/components/material-icon";
@@ -98,71 +98,104 @@ function ImportPage() {
   const { data: context } = useSuspenseQuery(importQueryOptions);
   const { data: me } = useSuspenseQuery(whoamiQueryOptions);
 
+  const queryClient = useQueryClient();
   const [investorId, setInvestorId] = useState(context.selectedInvestorId ?? "");
-  const [file, setFile] = useState<File | null>(null);
-  const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [queue, setQueue] = useState<File[]>([]);
+  const [raw, setRaw] = useState<{ file: File; workbook: Awaited<ReturnType<typeof readWorkbook>> } | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ count: number; asOfDate: string; investorId: string } | null>(null);
   const [activeSheet, setActiveSheet] = useState(0);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedInvestor = context.investors.find((investor) => investor.id === investorId);
-  const covenantWarnings = context.preview.filter(
-    (asset) =>
-      asset.ltv != null &&
-      asset.ltvCovenant != null &&
-      asset.ltv >= asset.ltvCovenant * 0.9,
+  const investorContext = useQuery(investorContextOptions(investorId));
+  const file = queue[0] ?? null;
+
+  useEffect(() => {
+    if (!file) {
+      setRaw(null);
+      return;
+    }
+    let cancelled = false;
+    setParsing(true);
+    setRaw(null);
+    readWorkbook(file)
+      .then((workbook) => {
+        if (!cancelled) setRaw({ file, workbook });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        toast.error("Lecture impossible", { description: "Le classeur n'a pas pu être ouvert." });
+        setQueue((q) => q.slice(1));
+      })
+      .finally(() => {
+        if (!cancelled) setParsing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [file]);
+
+  const parsed: CheckResult | null = useMemo(
+    () => (raw && investorContext.data ? checkWorkbook(raw.workbook, investorContext.data.check) : null),
+    [raw, investorContext.data],
   );
 
-  async function acceptFile(next: File | undefined) {
-    if (!next) return;
-    if (!next.name.toLowerCase().endsWith(".xlsx")) {
-      toast.error("Format non accepté", { description: "Seuls les fichiers .xlsx sont admis." });
-      return;
+  function acceptFiles(list: FileList | File[] | null | undefined) {
+    const accepted: File[] = [];
+    for (const next of Array.from(list ?? [])) {
+      if (!next.name.toLowerCase().endsWith(".xlsx")) {
+        toast.error(`Format non accepté : ${next.name}`, { description: "Seuls les fichiers .xlsx sont admis." });
+        continue;
+      }
+      if (next.size > MAX_FILE_BYTES) {
+        toast.error(`Fichier trop volumineux : ${next.name}`, { description: "Taille maximale : 5 Mo." });
+        continue;
+      }
+      accepted.push(next);
     }
-    if (next.size > MAX_BYTES) {
-      toast.error("Fichier trop volumineux", { description: "Taille maximale : 50 Mo." });
-      return;
-    }
-    setFile(next);
-    setParsed(null);
-    setParsing(true);
-    try {
-      const result = await parseWorkbook(next);
-      setParsed(result);
+    if (accepted.length) {
+      setFailure(null);
+      setSuccess(null);
       setActiveSheet(0);
-    } catch {
-      toast.error("Lecture impossible", { description: "Le classeur n'a pas pu être ouvert." });
-    } finally {
-      setParsing(false);
+      setQueue((q) => [...q, ...accepted]);
     }
   }
 
+  function nextFile() {
+    setActiveSheet(0);
+    setQueue((q) => q.slice(1));
+  }
+
   async function validateImport() {
-    if (!file || !context.schemaVersion || !investorId) return;
+    if (!file || !parsed?.payload || !investorContext.data || !investorId) return;
+    setSaving(true);
+    setFailure(null);
+    const filePath = `${investorContext.data.check.investorCode}/${stamp(new Date())}_${file.name}`;
     try {
-      await recordImport({
-        data: {
-          investorId,
-          fileName: file.name,
-          templateVersion: context.schemaVersion,
-          asOfDate: new Date().toISOString().slice(0, 10),
-        },
+      const { error } = await supabase.storage.from("imports").upload(filePath, file, {
+        contentType: file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      toast.success("Import enregistré", {
-        description: "Statut : en attente de traitement.",
+      if (error) throw new Error(`Dépôt du fichier : ${error.message}`);
+      const result = await commitImport({
+        data: { investorId, fileName: file.name, filePath, payload: parsed.payload },
       });
-      setFile(null);
-      setParsed(null);
+      setSuccess({ count: result.assetsCount, asOfDate: result.asOfDate, investorId });
+      await queryClient.invalidateQueries();
+      nextFile();
     } catch (error) {
-      toast.error("Enregistrement impossible", {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      setFailure(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSaving(false);
     }
   }
 
   const blocked = (parsed?.errors.length ?? 0) > 0;
-  const sheet = parsed?.sheets[activeSheet];
+  const sheet = parsed?.preview[activeSheet];
+  const lastImports = investorContext.data?.lastImports ?? [];
 
   return (
     <LurShell
