@@ -1,4 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { exitReasonLabel } from "@/lib/asset-status";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 
 import { MaterialIcon } from "@/components/material-icon";
@@ -348,6 +349,30 @@ function DashboardPage() {
             </table>
           </div>
         </section>
+
+        {data.isAdmin && data.exitedAssets.length > 0 && (
+          <details className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-sm">
+            <summary className="cursor-pointer font-headline-sm text-headline-sm text-on-surface">
+              Actifs sortis ({data.exitedAssets.length})
+            </summary>
+            <ul className="mt-4 divide-y divide-outline-variant/40">
+              {data.exitedAssets.map((asset) => (
+                <li key={asset.assetId}>
+                  <Link
+                    to="/actifs/$assetId"
+                    params={{ assetId: asset.assetId }}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3 hover:bg-surface-container-low"
+                  >
+                    <span className="font-table-data text-table-data text-on-surface">{asset.name}</span>
+                    <span className="font-body-sm tabular-nums text-secondary">
+                      {formatDate(asset.exitDate)} · {exitReasonLabel(asset.exitReason)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
 
         <section className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
