@@ -273,7 +273,7 @@ function ImportPage() {
             onDrop={(event) => {
               event.preventDefault();
               setDragging(false);
-              void acceptFile(event.dataTransfer.files?.[0]);
+              acceptFiles(event.dataTransfer.files);
             }}
             className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 text-center transition-colors ${
               dragging ? "border-primary bg-surface-container-low" : "border-outline-variant"
@@ -284,7 +284,7 @@ function ImportPage() {
               Déposez un ou plusieurs fichiers .xlsx au format du modèle standard
             </p>
             <p className="font-audit-trail text-[11px] text-secondary">
-              Fichiers acceptés : .xlsx uniquement (taille max 50 Mo)
+              Fichiers acceptés : .xlsx uniquement (taille max 5 Mo)
             </p>
             <button
               type="button"
@@ -298,8 +298,12 @@ function ImportPage() {
               ref={inputRef}
               type="file"
               accept=".xlsx"
+              multiple
               className="hidden"
-              onChange={(event) => void acceptFile(event.target.files?.[0])}
+              onChange={(event) => {
+                acceptFiles(event.target.files);
+                event.target.value = "";
+              }}
             />
           </div>
 
@@ -312,9 +316,9 @@ function ImportPage() {
                     {file.name}
                   </p>
                   <p className="font-audit-trail text-[11px] text-secondary">
-                    Fichier chargé · modèle {context.schemaVersion ?? "—"} ·{" "}
-                    {Math.round(file.size / 1024)} Ko
+                    Fichier chargé · modèle {TEMPLATE_VERSION} · {Math.round(file.size / 1024)} Ko
                     {parsing ? " · lecture…" : ""}
+                    {queue.length > 1 ? ` · ${queue.length - 1} fichier(s) en attente` : ""}
                   </p>
                 </div>
               </div>
@@ -322,7 +326,10 @@ function ImportPage() {
                 <button
                   type="button"
                   aria-label="Recharger le fichier"
-                  onClick={() => void acceptFile(file)}
+                  onClick={() => {
+                    const current = file;
+                    setQueue((q) => [new File([current], current.name, { type: current.type }), ...q.slice(1)]);
+                  }}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary hover:bg-surface-container-high"
                 >
                   <MaterialIcon name="sync" className="text-[18px]" />
@@ -330,16 +337,34 @@ function ImportPage() {
                 <button
                   type="button"
                   aria-label="Retirer le fichier"
-                  onClick={() => {
-                    setFile(null);
-                    setParsed(null);
-                  }}
+                  onClick={nextFile}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary hover:bg-surface-container-high"
                 >
                   <MaterialIcon name="delete" className="text-[18px]" />
                 </button>
               </div>
             </div>
+          )}
+
+          {success && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-outline-variant/60 bg-secondary-container p-4">
+              <p className="flex items-center gap-2 font-body-md text-[13px] font-semibold text-primary">
+                <MaterialIcon name="check_circle" className="text-[18px]" />
+                Import validé : {success.count} actifs mis à jour au {formatDate(success.asOfDate)}.
+              </p>
+              <Link
+                to="/"
+                search={{ investisseur: success.investorId }}
+                className="font-label-sm text-[11px] uppercase tracking-wider text-primary hover:underline"
+              >
+                Tableau de bord
+              </Link>
+            </div>
+          )}
+          {investorContext.isError && (
+            <p role="alert" className="mt-4 font-body-sm text-error">
+              {investorContext.error instanceof Error ? investorContext.error.message : String(investorContext.error)}
+            </p>
           )}
         </section>
 
@@ -357,12 +382,12 @@ function ImportPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="flex items-center gap-1.5 rounded-full bg-surface-container-high px-3 py-1 font-label-sm text-[10px] uppercase tracking-wider text-on-surface-variant">
                   <MaterialIcon name="check_circle" className="text-[14px]" />
-                  {parsed.sheets.length} onglets lus
+                  {parsed.sheetsRead} onglets lus
                 </span>
                 <span className="flex items-center gap-1.5 rounded-full bg-tertiary-fixed px-3 py-1 font-label-sm text-[10px] uppercase tracking-wider text-on-tertiary-fixed">
                   <MaterialIcon name="warning" className="text-[14px]" />
-                  {covenantWarnings.length} avertissement
-                  {covenantWarnings.length > 1 ? "s" : ""}
+                  {parsed.warnings.length} avertissement
+                  {parsed.warnings.length > 1 ? "s" : ""}
                 </span>
                 <span className="flex items-center gap-1.5 rounded-full bg-error-container px-3 py-1 font-label-sm text-[10px] uppercase tracking-wider text-on-error-container">
                   <MaterialIcon name="error" className="text-[14px]" />
@@ -383,41 +408,29 @@ function ImportPage() {
                     Erreur bloquante
                   </p>
                 </div>
-                <p className="mt-1 font-label-sm text-[11px] uppercase tracking-wider text-on-error-container">
-                  Code : ERR_DATE_OUT_OF_RANGE
-                </p>
-                <p className="mt-2 font-body-sm text-[12px] text-on-surface-variant">
-                  Onglet {error.sheet}, ligne {error.line} : la date « {error.value} » n'est pas
-                  valide. Corrigez la date dans le fichier puis déposez-le à nouveau.
-                </p>
+                <p className="mt-2 font-body-sm text-[12px] text-on-surface-variant">{error.text}</p>
               </div>
             ))}
 
-            {covenantWarnings.map((asset) => (
+            {parsed.warnings.map((warning, index) => (
               <div
-                key={asset.assetId}
+                key={`w-${index}`}
                 className="mb-3 rounded-lg border border-tertiary-fixed-dim/60 bg-tertiary-fixed/40 p-4"
               >
                 <div className="flex items-center gap-2">
                   <MaterialIcon name="priority_high" className="text-[16px] text-tertiary" />
                   <p className="font-body-md text-[13px] font-semibold text-on-tertiary-fixed">
-                    Avertissement de covenant
+                    Avertissement
                   </p>
                 </div>
-                <p className="mt-1 font-label-sm text-[11px] uppercase tracking-wider text-on-tertiary-fixed-variant">
-                  Règle de prudence financière
-                </p>
-                <p className="mt-2 font-body-sm text-[12px] text-on-surface-variant">
-                  La LTV de {asset.name} ({formatPercent(asset.ltv)}) approche le seuil de covenant (
-                  {formatPercent(asset.ltvCovenant)}).
-                </p>
+                <p className="mt-2 font-body-sm text-[12px] text-on-surface-variant">{warning.text}</p>
               </div>
             ))}
 
             <div className="mb-4 flex flex-wrap gap-1 border-b border-outline-variant/60">
-              {parsed.sheets.map((entry, index) => (
+              {parsed.preview.map((entry, index) => (
                 <button
-                  key={entry.name}
+                  key={entry.sheet}
                   type="button"
                   onClick={() => setActiveSheet(index)}
                   className={`border-b-2 px-3 py-2 font-body-md text-[13px] transition-colors ${
@@ -426,38 +439,46 @@ function ImportPage() {
                       : "border-transparent text-secondary hover:text-on-surface"
                   }`}
                 >
-                  {entry.name} ({Math.max(entry.rows.length - 1, 0)})
+                  {entry.sheet} ({entry.rows.length})
                 </button>
               ))}
             </div>
 
+            {sheet && sheet.rows.length === 0 && (
+              <p className="font-body-sm text-secondary">Aucune ligne dans cet onglet.</p>
+            )}
+            {failure && (
+              <p role="alert" className="mt-4 rounded-lg border border-error/30 bg-error-container/40 p-4 font-body-sm text-[12px] text-error">
+                {failure}
+              </p>
+            )}
             {sheet && sheet.rows.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-outline-variant/60">
-                      {(sheet.rows[0] ?? []).map((heading, index) => (
+                      {sheet.headers.map((heading, index) => (
                         <th
                           key={index}
                           className="whitespace-nowrap px-3 py-3 font-label-md text-[11px] uppercase tracking-wider text-secondary"
                         >
-                          {heading ?? ""}
+                          {heading}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {sheet.rows.slice(1, 11).map((row, rowIndex) => (
+                    {sheet.rows.map((row) => (
                       <tr
-                        key={rowIndex}
+                        key={row.line}
                         className="border-b border-outline-variant/40 last:border-0"
                       >
-                        {(sheet.rows[0] ?? []).map((_, cellIndex) => (
+                        {row.cells.map((cell, cellIndex) => (
                           <td
                             key={cellIndex}
                             className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface"
                           >
-                            {row[cellIndex] ?? ""}
+                            {formatCell(cell)}
                           </td>
                         ))}
                       </tr>
@@ -479,23 +500,21 @@ function ImportPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setFile(null);
-                    setParsed(null);
-                  }}
+                  disabled={saving}
+                  onClick={nextFile}
                   className="rounded-lg border border-outline-variant px-4 py-2 font-label-md text-[12px] uppercase tracking-wider text-secondary hover:bg-surface-container-high"
                 >
                   Annuler
                 </button>
                 <button
                   type="button"
-                  disabled={blocked || !file || parsing}
+                  disabled={blocked || !parsed?.payload || parsing || saving}
                   title={blocked ? "Corrigez l'erreur bloquante pour valider" : undefined}
                   onClick={() => void validateImport()}
                   className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 font-label-md text-[12px] uppercase tracking-wider text-on-primary hover:bg-primary-container disabled:cursor-not-allowed disabled:bg-surface-container-high disabled:text-outline"
                 >
                   <MaterialIcon name="check" className="text-[18px]" />
-                  Valider l'import
+                  {saving ? "Validation…" : "Valider l'import"}
                 </button>
               </div>
             </div>
@@ -519,11 +538,13 @@ function ImportPage() {
               </button>
             </div>
 
-            {context.lastImports.length === 0 ? (
+            {investorContext.isPending ? (
+              <div className="h-24 animate-pulse rounded-lg bg-surface-container-high" />
+            ) : lastImports.length === 0 ? (
               <p className="font-body-sm text-secondary">Aucun import enregistré.</p>
             ) : (
               <ul className="space-y-3">
-                {context.lastImports.map((entry) => (
+                {lastImports.map((entry) => (
                   <li
                     key={entry.id}
                     className="rounded-lg border border-outline-variant/40 bg-surface p-4"
@@ -532,7 +553,7 @@ function ImportPage() {
                       <p className="font-body-sm text-secondary">
                         {formatDate(entry.importedAt)} · {entry.templateVersion}
                       </p>
-                      <span className="rounded-full bg-surface-container-high px-2 py-0.5 font-label-sm text-[10px] uppercase tracking-wider text-on-surface-variant">
+                      <span className={`rounded-full px-2 py-0.5 font-label-sm text-[10px] uppercase tracking-wider ${STATUS_STYLES[entry.status] ?? "bg-surface-container-high text-on-surface-variant"}`}>
                         {STATUS_LABELS[entry.status] ?? entry.status}
                       </span>
                     </div>
