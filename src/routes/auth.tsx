@@ -5,7 +5,11 @@ import { toast } from "sonner";
 import { MaterialIcon } from "@/components/material-icon";
 import { supabase } from "@/integrations/supabase/client";
 
+const DEACTIVATED_MESSAGE = "Votre compte a été désactivé. Contactez l'équipe de gestion.";
+
 export const Route = createFileRoute("/auth")({
+  validateSearch: (search: Record<string, unknown>): { desactive?: string } =>
+    search["desactive"] ? { desactive: "1" } : {},
   head: () => ({
     meta: [
       { title: "LUR · Connexion" },
@@ -33,6 +37,9 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [pending, setPending] = useState(false);
+  const { desactive } = Route.useSearch();
+  const [deactivated, setDeactivated] = useState(Boolean(desactive));
+  useEffect(() => setDeactivated(Boolean(desactive)), [desactive]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -43,10 +50,19 @@ function AuthPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setPending(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setPending(false);
+    setDeactivated(false);
+    const { data: signIn, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
+      setPending(false);
       toast.error("Connexion impossible", { description: error.message });
+      return;
+    }
+    const { data: profile } = await supabase
+      .from("profiles").select("is_active").eq("id", signIn.user.id).maybeSingle();
+    setPending(false);
+    if (profile && profile.is_active === false) {
+      await supabase.auth.signOut();
+      setDeactivated(true);
       return;
     }
     navigate({ to: "/" });
@@ -127,6 +143,11 @@ function AuthPage() {
               <p className="font-body-md text-sm text-secondary">Portail institutionnel sécurisé</p>
             </div>
 
+            {deactivated && (
+              <p role="alert" className="mb-5 rounded-lg bg-brick/10 p-3 font-body-sm text-sm text-brick">
+                {DEACTIVATED_MESSAGE}
+              </p>
+            )}
             <form className="space-y-5" noValidate onSubmit={submit}>
               <div>
                 <label

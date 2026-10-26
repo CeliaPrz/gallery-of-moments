@@ -62,7 +62,7 @@ function AssetsMenu({
                       className={`block truncate rounded-lg py-1.5 pl-11 pr-3 font-body-sm text-[12px] transition-colors ${
                         active
                           ? "bg-secondary-fixed text-on-secondary-fixed"
-                          : "text-on-primary/80 hover:bg-[#DCE5DA]/10"
+                          : `${asset.exited ? "text-on-primary/45" : "text-on-primary/80"} hover:bg-[#DCE5DA]/10`
                       }`}
                     >
                       {asset.name}

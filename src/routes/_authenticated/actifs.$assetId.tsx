@@ -19,6 +19,8 @@ import {
   formatYield,
 } from "@/lib/format";
 import { getDocumentDownload, getAssetSheet } from "@/lib/lur.functions";
+import { ActualEndEditor, ExitAssetButton, RestoreAssetButton, TenantContactsBlock } from "@/components/asset-admin";
+import { exitReasonLabel, isExited } from "@/lib/asset-status";
 
 const assetQueryOptions = (assetId: string) =>
   queryOptions({
@@ -178,6 +180,18 @@ function AssetSheetPage() {
                   {data.alerts.length} alerte{data.alerts.length > 1 ? "s" : ""}
                 </span>
               )}
+              {data.isAdmin && isExited(data.asset.status) && (
+                <span className="rounded-full bg-surface-container-high px-3 py-1 font-label-sm text-[10px] uppercase tracking-wider text-secondary">
+                  Sorti le {formatDate(data.asset.exitDate)} · {exitReasonLabel(data.asset.exitReason)}
+                </span>
+              )}
+              {data.isAdmin && (
+                <span className="ml-auto">
+                  {isExited(data.asset.status)
+                    ? <RestoreAssetButton assetId={data.asset.id} />
+                    : <ExitAssetButton assetId={data.asset.id} />}
+                </span>
+              )}
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-2 font-body-sm text-secondary">
               <span>{data.asset.assetType}</span>
@@ -324,6 +338,7 @@ function AssetSheetPage() {
                       "Surface",
                       "Loyer annuel",
                       "Échéance",
+                      "Fin réelle",
                       "Option de sortie",
                       "Indexation",
                       "Franchise (fin)",
@@ -359,7 +374,7 @@ function AssetSheetPage() {
                             </span>}
                           </div>
                         ) : (
-                          <p className="font-table-data text-table-data text-on-surface">
+                          <p className={`font-table-data text-table-data text-on-surface ${lease.tenantAnonymized ? "italic" : ""}`}>
                             {lease.tenantName || "—"}
                           </p>
                         )}
@@ -372,6 +387,12 @@ function AssetSheetPage() {
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
                         {lease.isVacant ? "—" : formatDate(lease.endDate)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
+                        {lease.isVacant ? "—" : formatDate(lease.actualEndDate)}
+                        {data.isAdmin && lease.leaseId && (
+                          <ActualEndEditor assetId={data.asset.id} leaseId={lease.leaseId} value={lease.actualEndDate} />
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 font-table-data text-table-data text-on-surface">
                         {lease.isVacant ? "—" : formatDate(lease.breakDate)}
@@ -393,6 +414,9 @@ function AssetSheetPage() {
               </table>
             </div>
             <div className="mt-5"><SourceRibbonBar source={data.source} /></div>
+            {data.isAdmin && data.tenantContacts.length > 0 && (
+              <TenantContactsBlock assetId={data.asset.id} tenants={data.tenantContacts} />
+            )}
           </SectionCard></div>
         )}
 
