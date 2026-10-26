@@ -499,7 +499,7 @@ export function checkWorkbook(workbook: RawWorkbook, context: CheckContext): Che
       const rents = assetLeases.map((l) => num(l.values.annual_rent ?? null));
       if (rents.every((r) => r != null) && !same(rents.reduce<number>((a, b) => a + (b ?? 0), 0), assetRent)) {
         warnings.push(
-          msg(SHEETS.baux ?? SHEETS.leases, null, "Loyer annuel (€)", `pour l'actif ${code}, la somme des loyers des baux est différente du loyer annuel de l'onglet Actifs (ligne ${row.line})`, "Vérifiez les loyers dans les deux onglets."),
+          msg(SHEETS.leases, null, "Loyer annuel (€)", `pour l'actif ${code}, la somme des loyers des baux est différente du loyer annuel de l'onglet Actifs (ligne ${row.line})`, "Vérifiez les loyers dans les deux onglets."),
         );
       }
     }
