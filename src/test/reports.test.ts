@@ -14,8 +14,8 @@ describe("rapport trimestriel", () => {
   });
   it("la version la plus haute est la référence", () => {
     const g = groupReportVersions([row({ id: "a", version: 1 }), row({ id: "b", version: 3 }), row({ id: "c", version: 2 })]);
-    expect(g[0].latest.id).toBe("b");
-    expect(g[0].older.map((r) => r.id)).toEqual(["c", "a"]);
+    expect(g[0]!.latest.id).toBe("b");
+    expect(g[0]!.older.map((r) => r.id)).toEqual(["c", "a"]);
   });
   it("le chemin commence par l'investor_id", () => {
     expect(reportStoragePath("inv-1", "T1 2026", 2, "pdf")).toBe("inv-1/T1 2026_v2.pdf");
