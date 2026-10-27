@@ -280,6 +280,11 @@ function ReportDetail({ reportId, onChanged, onOpen }: { reportId: string; onCha
             })}>{busy === "ai" ? "Rédaction…" : text ? "Régénérer" : "Rédiger le commentaire"}</button>
           )}
         </div>
+        {p?.latestDataDate && p.latestDataDate.slice(0, 10) < r.periodEnd && (
+          <p className="rounded-lg bg-alert-amber/15 px-3 py-2 text-[13px] text-alert-amber">
+            Les données datent du {formatDate(p.latestDataDate)}, avant la fin du trimestre {r.periodLabel}. Importez les données du trimestre avant de valider, ou vérifiez le libellé du rapport.
+          </p>
+        )}
         {isDraft ? (
           <textarea aria-label="Commentaire de gestion" className="min-h-[200px] w-full rounded-lg border border-outline-variant bg-surface p-3 font-body-md text-[13px]"
             value={text} onChange={(e) => setDraft(e.target.value)}
