@@ -86,7 +86,7 @@ type NavItem =
 const INVESTOR_NAV: NavItem[] = [
   { label: "Tableau de bord", icon: "grid_view", to: "/" },
   { label: "Actifs", icon: "apartment", anchor: "#actifs" },
-  { label: "Rapports", icon: "analytics" },
+  { label: "Rapports", icon: "analytics", to: "/rapports" },
   { label: "Documents", icon: "folder_open" },
 ];
 

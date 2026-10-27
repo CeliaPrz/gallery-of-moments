@@ -38,6 +38,16 @@ export function groupReportVersions(rows: ReportRow[]): { latest: ReportRow; old
     .sort((a, b) => b.latest.periodEnd.localeCompare(a.latest.periodEnd));
 }
 
+/** Liste minimale : une seule version, la plus élevée, par trimestre récent d'abord. */
+export function latestReportPerPeriod<T extends { periodLabel: string; periodEnd: string; version: number }>(rows: T[]): T[] {
+  const latest = new Map<string, T>();
+  for (const row of rows) {
+    const previous = latest.get(row.periodLabel);
+    if (!previous || row.version > previous.version) latest.set(row.periodLabel, row);
+  }
+  return [...latest.values()].sort((a, b) => b.periodEnd.localeCompare(a.periodEnd));
+}
+
 /** Chemin de stockage : le premier dossier est toujours l'investor_id. */
 export function reportStoragePath(investorId: string, periodLabel: string, version: number, ext: "pdf" | "json"): string {
   return `${investorId}/${periodLabel}_v${version}.${ext}`;

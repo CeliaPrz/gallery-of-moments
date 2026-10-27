@@ -1,8 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 import { buildDashboardAlerts, type DashboardAlert } from "./alerts";
-import { AI_SYSTEM_PROMPT, quarterPeriod, type ReportRow, type ReportStatus } from "./reports";
+import { storageUrlForBrowser } from "./asset-sheet";
+import { AI_SYSTEM_PROMPT, latestReportPerPeriod, quarterPeriod, type ReportRow, type ReportStatus } from "./reports";
+import { DOCUMENT_DOWNLOAD_TTL_SECONDS } from "./storage-ttl";
 
 const NO_ID = "00000000-0000-0000-0000-000000000000";
 const AI_MODEL = "claude-sonnet-5-5";
@@ -19,6 +23,54 @@ const toRow = (r: any): ReportRow => ({
   status: r.status as ReportStatus, validatedAt: r.validated_at, sentAt: r.sent_at,
   correctionReason: r.correction_reason, replacesReportId: r.replaces_report_id, pdfPath: r.pdf_path,
 });
+
+export type PublishedReport = Pick<ReportRow, "id" | "periodLabel" | "periodEnd" | "version" | "validatedAt" | "correctionReason"> & {
+  hasPdf: boolean;
+  isCorrected: boolean;
+};
+
+async function assertActiveInvestor(supabase: SupabaseClient<Database>, userId: string) {
+  const { data: profile, error } = await supabase.from("profiles").select("role, is_active, investor_id")
+    .eq("id", userId).maybeSingle();
+  if (error || profile?.role !== "investor" || profile.is_active !== true || !profile.investor_id) {
+    throw new Error("Les rapports ne sont pas disponibles pour le moment.");
+  }
+}
+
+export const listPublishedReports = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<PublishedReport[]> => {
+    await assertActiveInvestor(context.supabase, context.userId);
+    // RLS supplies only the connected investor's rows; no investor identifier is accepted from the browser.
+    const { data: rows, error } = await context.supabase.from("reports")
+      .select("id, period_label, period_end, version, validated_at, correction_reason, pdf_path")
+      .in("status", ["valide", "envoye"]).order("period_end", { ascending: false }).order("version", { ascending: false });
+    if (error) throw new Error("Les rapports ne sont pas disponibles pour le moment.");
+    return latestReportPerPeriod((rows ?? []).map((row) => ({
+        id: row.id, periodLabel: row.period_label, periodEnd: row.period_end, version: row.version,
+        validatedAt: row.validated_at, correctionReason: row.correction_reason,
+        hasPdf: Boolean(row.pdf_path?.trim()), isCorrected: row.version > 1,
+      })));
+  });
+
+export const getPublishedReportDownload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((reportId: string) => {
+    if (typeof reportId !== "string" || !reportId.trim()) throw new Error("Ce rapport n'est pas disponible.");
+    return reportId;
+  })
+  .handler(async ({ context, data }) => {
+    await assertActiveInvestor(context.supabase, context.userId);
+    // Re-read through RLS on every click, including publication state, before minting a private link.
+    const { data: report, error } = await context.supabase.from("reports").select("pdf_path")
+      .eq("id", data).in("status", ["valide", "envoye"]).maybeSingle();
+    if (error || !report) throw new Error("Ce rapport n'est pas disponible.");
+    if (!report.pdf_path?.trim()) throw new Error("PDF bientôt disponible");
+    const { data: signed, error: signingError } = await context.supabase.storage.from("reports")
+      .createSignedUrl(report.pdf_path, DOCUMENT_DOWNLOAD_TTL_SECONDS, { download: true });
+    if (signingError || !signed?.signedUrl) throw new Error("Ce rapport n'est pas disponible.");
+    return { url: storageUrlForBrowser(signed.signedUrl, process.env["SUPABASE_URL"], import.meta.env["VITE_SUPABASE_URL"]) };
+  });
 
 export const listReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

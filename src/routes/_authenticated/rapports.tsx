@@ -1,9 +1,10 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { LurShell } from "@/components/lur-shell";
+import { InvestorReports, publishedReportsQuery } from "@/components/investor-reports";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatMillions, formatYield } from "@/lib/format";
@@ -20,19 +21,21 @@ const whoamiQuery = queryOptions({ queryKey: ["whoami"], queryFn: () => whoami()
 export const Route = createFileRoute("/_authenticated/rapports")({
   loader: async ({ context }) => {
     const me = await context.queryClient.ensureQueryData(whoamiQuery);
-    if (me.role !== "admin") throw redirect({ to: "/" });
+    if (me.role === "investor") await context.queryClient.ensureQueryData(publishedReportsQuery(me.userId));
   },
   head: () => ({
     meta: [
       { title: "Rapports trimestriels — LUR Gestion d'actifs" },
-      { name: "description", content: "Préparation, validation et suivi des rapports trimestriels par investisseur." },
+      { name: "description", content: "Rapports trimestriels confidentiels du portefeuille immobilier LUR." },
       { property: "og:title", content: "Rapports trimestriels — LUR Gestion d'actifs" },
-      { property: "og:description", content: "Préparation, validation et suivi des rapports trimestriels par investisseur." },
+      { property: "og:description", content: "Rapports trimestriels confidentiels du portefeuille immobilier LUR." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
   }),
   component: ReportsPage,
+  pendingComponent: () => <main className="mx-auto max-w-[1200px] space-y-4 p-6 lg:p-8">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</main>,
+  errorComponent: () => <main className="mx-auto max-w-[1200px] p-6 lg:p-8"><p role="alert" className="rounded-lg bg-brick/10 p-3 font-body-sm text-[13px] text-brick">Les rapports ne sont pas disponibles pour le moment.</p></main>,
 });
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -52,6 +55,12 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function ReportsPage() {
+  const { data: me } = useSuspenseQuery(whoamiQuery);
+  if (me.role === "investor") return <InvestorReports userId={me.userId} fullName={me.fullName} investorName={me.investor?.name ?? ""} />;
+  return <AdminReportsPage />;
+}
+
+function AdminReportsPage() {
   const { data: me } = useSuspenseQuery(whoamiQuery);
   const qc = useQueryClient();
   const [investorId, setInvestorId] = useState<string | null>(null);
