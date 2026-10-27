@@ -1,7 +1,8 @@
 import {
   AlertTriangle, ArrowRight, AtSign, BarChart3, Building, Building2, CalendarClock, Check,
   CheckCircle2, ChevronDown, ChevronRight, CircleX, Download, Eye, EyeOff, File,
-  FileDown, FileSpreadsheet, FileText, FileUp, FolderOpen, Hourglass, Info, Landmark,
+  FileDown, FileSpreadsheet, FileText, FileUp,
+  ClipboardCheck, FolderOpen, Hourglass, Info, Landmark,
   LayoutDashboard, LayoutGrid, LineChart, Lock, LogOut, MapPin, Menu, BellRing, Banknote,
   BadgeCheck, ClipboardList, History, CircleAlert, RefreshCw, ShieldCheck, Trash2, TrendingUp,
   User, Users, X, type LucideIcon,
@@ -50,6 +51,7 @@ const ICONS: Record<string, LucideIcon> = {
   table_chart: FileSpreadsheet,
   trending_up: TrendingUp,
   upload_file: FileUp,
+  fact_check: ClipboardCheck,
   verified: BadgeCheck,
   verified_user: ShieldCheck,
   visibility: Eye,
