@@ -5,7 +5,7 @@ import { buildDashboardAlerts, type DashboardAlert } from "./alerts";
 import { AI_SYSTEM_PROMPT, quarterPeriod, type ReportRow, type ReportStatus } from "./reports";
 
 const NO_ID = "00000000-0000-0000-0000-000000000000";
-const AI_MODEL = "claude-sonnet-5";
+const AI_MODEL = "claude-sonnet-5-5";
 
 
 /** Refuse tout appel qui n'émane pas d'une administratrice active (lecture avec le jeton de l'utilisateur). */
