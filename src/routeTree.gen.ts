@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedControleRouteImport } from './routes/_authenticated/controle'
 import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedRapportsRouteImport } from './routes/_authenticated/rapports'
 import { Route as AuthenticatedActifsAssetIdRouteImport } from './routes/_authenticated/actifs.$assetId'
@@ -28,6 +29,11 @@ const AuthRoute = AuthRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedControleRoute = AuthenticatedControleRouteImport.update({
+  id: '/controle',
+  path: '/controle',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedImportRoute = AuthenticatedImportRouteImport.update({
@@ -50,12 +56,14 @@ const AuthenticatedActifsAssetIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
+  '/controle': typeof AuthenticatedControleRoute
   '/import': typeof AuthenticatedImportRoute
   '/rapports': typeof AuthenticatedRapportsRoute
   '/actifs/$assetId': typeof AuthenticatedActifsAssetIdRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
+  '/controle': typeof AuthenticatedControleRoute
   '/import': typeof AuthenticatedImportRoute
   '/rapports': typeof AuthenticatedRapportsRoute
   '/': typeof AuthenticatedIndexRoute
@@ -65,6 +73,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/controle': typeof AuthenticatedControleRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/rapports': typeof AuthenticatedRapportsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -72,13 +81,15 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/import' | '/rapports' | '/actifs/$assetId'
+  fullPaths:
+    '/' | '/auth' | '/controle' | '/import' | '/rapports' | '/actifs/$assetId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/import' | '/rapports' | '/' | '/actifs/$assetId'
+  to: '/auth' | '/controle' | '/import' | '/rapports' | '/' | '/actifs/$assetId'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/controle'
     | '/_authenticated/import'
     | '/_authenticated/rapports'
     | '/_authenticated/'
@@ -113,6 +124,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/controle': {
+      id: '/_authenticated/controle'
+      path: '/controle'
+      fullPath: '/controle'
+      preLoaderRoute: typeof AuthenticatedControleRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/import': {
       id: '/_authenticated/import'
       path: '/import'
@@ -138,6 +156,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedControleRoute: typeof AuthenticatedControleRoute
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedRapportsRoute: typeof AuthenticatedRapportsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -145,6 +164,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedControleRoute: AuthenticatedControleRoute,
   AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedRapportsRoute: AuthenticatedRapportsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,

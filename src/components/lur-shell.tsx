@@ -79,7 +79,7 @@ function AssetsMenu({
 }
 
 type NavItem =
-  | { label: string; icon: string; to: "/" | "/import" | "/rapports" }
+  | { label: string; icon: string; to: "/" | "/import" | "/controle" | "/rapports" }
   | { label: string; icon: string; anchor: "#actifs" }
   | { label: string; icon: string };
 
