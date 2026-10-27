@@ -1,0 +1,37 @@
+name: Tests Playwright
+
+on:
+  workflow_dispatch:        # bouton « Run workflow » dans l'onglet Actions
+  push:
+    branches: [main]        # à chaque mise à jour de main (après le déploiement Vercel)
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: e2e
+    env:
+      BASE_URL: https://gallery-of-moments.vercel.app
+      LUR_ADMIN_PASSWORD: ${{ secrets.LUR_ADMIN_PASSWORD }}
+      LUR_LAURENT_PASSWORD: ${{ secrets.LUR_LAURENT_PASSWORD }}
+      LUR_MARTA_PASSWORD: ${{ secrets.LUR_MARTA_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Attendre le déploiement Vercel
+        if: github.event_name == 'push'
+        run: sleep 120
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - name: Rapport de test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-playwright
+          path: e2e/playwright-report
+          retention-days: 30
