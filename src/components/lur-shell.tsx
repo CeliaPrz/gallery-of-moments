@@ -79,7 +79,7 @@ function AssetsMenu({
 }
 
 type NavItem =
-  | { label: string; icon: string; to: "/" | "/import" }
+  | { label: string; icon: string; to: "/" | "/import" | "/rapports" }
   | { label: string; icon: string; anchor: "#actifs" }
   | { label: string; icon: string };
 
@@ -106,7 +106,7 @@ const ADMIN_NAV: { group: string; items: NavItem[] }[] = [
       { label: "Investisseurs", icon: "groups" },
       { label: "Import", icon: "upload_file", to: "/import" },
       { label: "Historique des imports", icon: "history" },
-      { label: "Rapports admin", icon: "analytics" },
+      { label: "Rapports admin", icon: "analytics", to: "/rapports" },
     ],
   },
 ];

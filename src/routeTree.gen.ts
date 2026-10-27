@@ -13,6 +13,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
+import { Route as AuthenticatedRapportsRouteImport } from './routes/_authenticated/rapports'
 import { Route as AuthenticatedActifsAssetIdRouteImport } from './routes/_authenticated/actifs.$assetId'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -34,6 +35,11 @@ const AuthenticatedImportRoute = AuthenticatedImportRouteImport.update({
   path: '/import',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRapportsRoute = AuthenticatedRapportsRouteImport.update({
+  id: '/rapports',
+  path: '/rapports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedActifsAssetIdRoute =
   AuthenticatedActifsAssetIdRouteImport.update({
     id: '/actifs/$assetId',
@@ -45,11 +51,13 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
   '/import': typeof AuthenticatedImportRoute
+  '/rapports': typeof AuthenticatedRapportsRoute
   '/actifs/$assetId': typeof AuthenticatedActifsAssetIdRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/import': typeof AuthenticatedImportRoute
+  '/rapports': typeof AuthenticatedRapportsRoute
   '/': typeof AuthenticatedIndexRoute
   '/actifs/$assetId': typeof AuthenticatedActifsAssetIdRoute
 }
@@ -58,19 +66,21 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
+  '/_authenticated/rapports': typeof AuthenticatedRapportsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/actifs/$assetId': typeof AuthenticatedActifsAssetIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/import' | '/actifs/$assetId'
+  fullPaths: '/' | '/auth' | '/import' | '/rapports' | '/actifs/$assetId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/import' | '/' | '/actifs/$assetId'
+  to: '/auth' | '/import' | '/rapports' | '/' | '/actifs/$assetId'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/import'
+    | '/_authenticated/rapports'
     | '/_authenticated/'
     | '/_authenticated/actifs/$assetId'
   fileRoutesById: FileRoutesById
@@ -110,6 +120,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedImportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/rapports': {
+      id: '/_authenticated/rapports'
+      path: '/rapports'
+      fullPath: '/rapports'
+      preLoaderRoute: typeof AuthenticatedRapportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/actifs/$assetId': {
       id: '/_authenticated/actifs/$assetId'
       path: '/actifs/$assetId'
@@ -122,12 +139,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
+  AuthenticatedRapportsRoute: typeof AuthenticatedRapportsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedActifsAssetIdRoute: typeof AuthenticatedActifsAssetIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedImportRoute: AuthenticatedImportRoute,
+  AuthenticatedRapportsRoute: AuthenticatedRapportsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedActifsAssetIdRoute: AuthenticatedActifsAssetIdRoute,
 }

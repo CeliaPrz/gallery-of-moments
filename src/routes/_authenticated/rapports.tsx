@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { queryOptions, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { LurShell } from "@/components/lur-shell";
@@ -95,8 +95,8 @@ function ReportsPage() {
                 </thead>
                 <tbody>
                   {groups.map(({ latest, older }) => (
-                    <>
-                      <tr key={latest.id} className={`cursor-pointer border-t border-outline-variant/40 font-semibold ${selected === latest.id ? "bg-secondary-container/60" : "hover:bg-secondary-container/30"}`} onClick={() => setSelected(latest.id)}>
+                    <Fragment key={latest.id}>
+                      <tr className={`cursor-pointer border-t border-outline-variant/40 font-semibold ${selected === latest.id ? "bg-secondary-container/60" : "hover:bg-secondary-container/30"}`} onClick={() => setSelected(latest.id)}>
                         <td className="py-2.5">{latest.periodLabel}</td><td>v{latest.version}</td><td><StatusPill status={latest.status} /></td>
                         <td className="tabular-nums">{formatDate(latest.validatedAt)}</td><td className="tabular-nums">{formatDate(latest.sentAt)}</td>
                         <td className="text-right">
@@ -115,7 +115,7 @@ function ReportsPage() {
                           <td className="text-right font-body-sm text-[12px]">Remplacée par la version {latest.version}</td>
                         </tr>
                       ))}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
