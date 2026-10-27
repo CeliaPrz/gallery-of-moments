@@ -5,6 +5,7 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { MaterialIcon } from "@/components/material-icon";
 import { LurShell } from "@/components/lur-shell";
 import { AccountMenu } from "@/components/account-menu";
+import { ReportNotice } from "@/components/report-notice";
 import {
   formatDate,
   formatMillions,
@@ -139,6 +140,7 @@ function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-[1200px] space-y-6 p-6 lg:p-8">
+        {!data.isAdmin && <ReportNotice />}
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h1 className="font-display-md text-display-md text-on-surface">Tableau de bord</h1>
           {data.isAdmin && (

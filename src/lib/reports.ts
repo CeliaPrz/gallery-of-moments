@@ -134,3 +134,13 @@ export const AI_SYSTEM_PROMPT =
   "- Écris \"la LTV\".\n" +
   "- Ne décris aucune action de gestion, aucun suivi, aucune négociation, aucune intention : tu ne les connais pas.\n" +
   "- Si la date des données est antérieure à la fin du trimestre du rapport, écris \"données au {date}\" sans prétendre décrire tout le trimestre.";
+
+/** Bandeau investisseur : rapports publiés validés il y a moins de 30 jours et non fermés, le plus récent d'abord. */
+export const REPORT_NOTICE_DAYS = 30;
+export function reportNotices<T extends { id: string; validatedAt: string | null }>(reports: T[], now: Date, dismissed: Set<string>): T[] {
+  const limit = now.getTime() - REPORT_NOTICE_DAYS * 86_400_000;
+  return reports
+    .filter((r) => r.validatedAt && new Date(r.validatedAt).getTime() > limit && !dismissed.has(r.id))
+    .sort((a, b) => (b.validatedAt ?? "").localeCompare(a.validatedAt ?? ""));
+}
+export const reportNoticeStorageKey = (userId: string) => `lur:report-notices-dismissed:${userId}`;
