@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Rapports investisseur : dernière version publiée par trimestre, téléchargement PDF signé court, états vide et sans PDF ; espace administratrice inchangé.
+- [ ] Vérifier la liste et le téléchargement connectée en investisseur — session Supabase externe à vérifier.
 - [x] Réouvrir le formulaire Anthropic, rétablir claude-sonnet-5-5 sans modèles Lovable et conserver les trois prochaines échéances par actif.
 - [x] Écran 1/4 reçu — Connexion
 - [x] Écran 2/4 reçu — Tableau de bord (« Bonjour Laurent »)
