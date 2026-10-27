@@ -31,7 +31,17 @@ Les quatre écrans du MVP ont été conçus dans Stitch (mode Web), puis intégr
 | Fiche actif | Investisseur | Synthèse, baux et locataires, financement avec covenant, business plan | `stitch-fiche-actif.png` |
 | Import | Administratrice | Dépôt du fichier, aperçu par onglet, erreurs et avertissements, validation | `stitch-import.png` |
 
-Déposer les captures dans ce dossier sous ces noms pour qu'elles s'affichent.
+### Connexion
+![Écran de connexion](stitch-connexion.png)
+
+### Tableau de bord
+![Tableau de bord investisseur](stitch-tableau-de-bord.png)
+
+### Fiche actif
+![Fiche actif](stitch-fiche-actif.png)
+
+### Import
+![Import Excel, vue administratrice](stitch-import.png)
 
 ## Écarts entre les maquettes et l'application livrée
 
