@@ -104,6 +104,7 @@ const ADMIN_NAV: { group: string; items: NavItem[] }[] = [
     group: "Administration",
     items: [
       { label: "Import", icon: "upload_file", to: "/import" },
+      { label: "Contrôle", icon: "fact_check", to: "/controle" },
       { label: "Rapports admin", icon: "analytics", to: "/rapports" },
     ],
   },
