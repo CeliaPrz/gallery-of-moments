@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Réouvrir le formulaire Anthropic, rétablir claude-sonnet-5-5 sans modèles Lovable et conserver les trois prochaines échéances par actif.
+- [x] Réouvrir le formulaire Anthropic, rétablir claude-sonnet-5-5 sans modèles Lovable et conserver les trois prochaines échéances par actif.
 - [x] Écran 1/4 reçu — Connexion
 - [x] Écran 2/4 reçu — Tableau de bord (« Bonjour Laurent »)
 - [x] Écran 3/4 reçu — Fiche actif Arturo Soria 45
