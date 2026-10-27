@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { buildDashboardAlerts, type DashboardAlert } from "./alerts";
 import { storageUrlForBrowser } from "./asset-sheet";
-import { AI_SYSTEM_PROMPT, quarterPeriod, type ReportRow, type ReportStatus } from "./reports";
+import { AI_SYSTEM_PROMPT, latestReportPerPeriod, quarterPeriod, type ReportRow, type ReportStatus } from "./reports";
 import { DOCUMENT_DOWNLOAD_TTL_SECONDS } from "./storage-ttl";
 
 const NO_ID = "00000000-0000-0000-0000-000000000000";
@@ -46,16 +46,11 @@ export const listPublishedReports = createServerFn({ method: "GET" })
       .select("id, period_label, period_end, version, validated_at, correction_reason, pdf_path")
       .in("status", ["valide", "envoye"]).order("period_end", { ascending: false }).order("version", { ascending: false });
     if (error) throw new Error("Les rapports ne sont pas disponibles pour le moment.");
-    const latest = new Map<string, PublishedReport>();
-    for (const row of rows ?? []) {
-      const previous = latest.get(row.period_label);
-      if (!previous || row.version > previous.version) latest.set(row.period_label, {
+    return latestReportPerPeriod((rows ?? []).map((row) => ({
         id: row.id, periodLabel: row.period_label, periodEnd: row.period_end, version: row.version,
         validatedAt: row.validated_at, correctionReason: row.correction_reason,
         hasPdf: Boolean(row.pdf_path?.trim()), isCorrected: row.version > 1,
-      });
-    }
-    return [...latest.values()].sort((a, b) => b.periodEnd.localeCompare(a.periodEnd));
+      })));
   });
 
 export const getPublishedReportDownload = createServerFn({ method: "POST" })
