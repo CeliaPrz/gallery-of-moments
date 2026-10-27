@@ -33,7 +33,7 @@ export function groupReportVersions(rows: ReportRow[]): { latest: ReportRow; old
   return [...byPeriod.values()]
     .map((list) => {
       const sorted = [...list].sort((a, b) => b.version - a.version);
-      return { latest: sorted[0], older: sorted.slice(1) };
+      return { latest: sorted[0]!, older: sorted.slice(1) };
     })
     .sort((a, b) => b.latest.periodEnd.localeCompare(a.latest.periodEnd));
 }

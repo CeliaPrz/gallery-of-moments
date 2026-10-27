@@ -47,7 +47,7 @@ const btn2 = "rounded-lg border border-outline-variant px-4 py-2 font-body-md te
 const errCls = "rounded-lg bg-[#A23B2A]/10 p-3 font-body-sm text-[13px] text-[#A23B2A]";
 
 function StatusPill({ status }: { status: string }) {
-  const s = STATUS[status] ?? STATUS.brouillon;
+  const s = STATUS[status] ?? STATUS["brouillon"]!;
   return <span className={`rounded-full px-2.5 py-0.5 font-label-sm text-[11px] ${s.cls}`}>{s.label}</span>;
 }
 
