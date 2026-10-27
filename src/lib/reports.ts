@@ -38,7 +38,7 @@ export function groupReportVersions(rows: ReportRow[]): { latest: ReportRow; old
     .sort((a, b) => b.latest.periodEnd.localeCompare(a.latest.periodEnd));
 }
 
-/** Chemin de stockage : le premier dossier est toujours l'investor_id. */
+/** Liste minimale : une seule version, la plus élevée, par trimestre récent d'abord. */
 export function latestReportPerPeriod<T extends { periodLabel: string; periodEnd: string; version: number }>(rows: T[]): T[] {
   const latest = new Map<string, T>();
   for (const row of rows) {

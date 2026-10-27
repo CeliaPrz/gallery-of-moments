@@ -109,7 +109,7 @@ describe("rapports publiés côté investisseur", () => {
     expect(client.sign).not.toHaveBeenCalled();
   });
 
-  it.each([[], [report({ status: "brouillon" })], [report({ id: "different-report" })]])("ne signe aucun rapport absent de la lecture autorisée ou non publié", async (rows) => {
+  it.each([{ rows: [] }, { rows: [report({ status: "brouillon" })] }, { rows: [report({ id: "different-report" })] }])("ne signe aucun rapport absent de la lecture autorisée ou non publié", async ({ rows }) => {
     const client = mockClient(rows);
     await expect(download({ context: context(client), data: "report-1" })).rejects.toThrow();
     expect(client.sign).not.toHaveBeenCalled();
