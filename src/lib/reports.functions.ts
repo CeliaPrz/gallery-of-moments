@@ -7,6 +7,7 @@ import { buildDashboardAlerts, type DashboardAlert } from "./alerts";
 import { storageUrlForBrowser } from "./asset-sheet";
 import { AI_SYSTEM_PROMPT, latestReportPerPeriod, quarterPeriod, type ReportRow, type ReportStatus } from "./reports";
 import { DOCUMENT_DOWNLOAD_TTL_SECONDS } from "./storage-ttl";
+import { formatDate, formatMillions, formatYield } from "./format";
 
 const NO_ID = "00000000-0000-0000-0000-000000000000";
 const AI_MODEL = "claude-sonnet-5-5";
@@ -199,18 +200,29 @@ async function loadContent(supabase: any, reportId: string): Promise<ReportConte
   };
 }
 
-/** Données envoyées à l'IA et utilisées pour le contrôle des chiffres : jamais de contacts, e-mails ni NIF. */
+/** Données envoyées à l'IA et utilisées pour le contrôle des chiffres : jamais de contacts, e-mails ni NIF.
+ * Les valeurs sont déjà formatées en français, exactement comme à l'écran. */
 export function aiFacts(c: ReportContent) {
+  const p = c.portfolio;
   return {
     periode: c.report.periodLabel,
-    portefeuille: c.portfolio,
+    fin_du_trimestre: formatDate(c.report.periodEnd),
+    portefeuille: p ? {
+      valeur: formatMillions(p.totalValue, 1), loyers_annuels: formatMillions(p.totalAnnualRent, 2),
+      occupation: formatYield(p.occupancyRate), ltv: formatYield(p.portfolioLtv), donnees_au: formatDate(p.latestDataDate),
+    } : null,
     actifs: c.assets.map((a) => ({
-      nom: a.name, ville: a.city, valeur: a.marketValue, loyer_annuel: a.annualRent, occupation: a.occupancyRate, ltv: a.ltv,
-      prets: a.loans.map((l) => ({ preteur: l.lender, encours: l.outstanding, echeance: l.maturityDate })),
-      echeances_baux: a.leaseEvents,
-      business_plan: a.bp ? { version: a.bp.versionLabel, rendement_initial: a.bp.initialYield, tri_cible: a.bp.targetIrr } : null,
+      nom: a.name, ville: a.city, valeur: formatMillions(a.marketValue, 1), loyer_annuel: formatMillions(a.annualRent, 2),
+      occupation: formatYield(a.occupancyRate), ltv: formatYield(a.ltv),
+      prets: a.loans.map((l) => ({ preteur: l.lender, encours: formatMillions(l.outstanding, 1), echeance: formatDate(l.maturityDate) })),
+      echeances_baux: a.leaseEvents.map((e) => ({ locataire: e.tenantName, echeance_bail: formatDate(e.endDate), option_de_sortie: formatDate(e.breakDate) })),
+      business_plan: a.bp ? { version: a.bp.versionLabel, rendement_initial: formatYield(a.bp.initialYield), tri_cible: formatYield(a.bp.targetIrr) } : null,
     })),
-    alertes: c.alerts,
+    alertes: c.alerts.map((al) => al.kind === "bail"
+      ? { type: al.event === "sortie" ? "option de sortie" : "échéance de bail", actif: al.assetName, locataire: al.tenantName, date: formatDate(al.date) }
+      : al.kind === "financement"
+        ? { type: "LTV proche du covenant", actif: al.assetName, ltv: formatYield(al.ltv), covenant: formatYield(al.covenant) }
+        : { type: "lot vacant", actif: al.assetName, lot: al.label, mois_de_vacance: al.months }),
   };
 }
 
