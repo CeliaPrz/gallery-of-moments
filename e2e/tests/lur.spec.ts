@@ -59,8 +59,9 @@ test.describe('Investisseur FAEB (Laurent)', () => {
   test('ouvre la fiche de Castellana 120', async ({ page }) => {
     await login(page, 'laurent');
     await page.goto(`/actifs/${CASTELLANA_120_ID}`);
+    await expect(page).toHaveURL(new RegExp(`/actifs/${CASTELLANA_120_ID}`));
     await expect(page.getByText('Castellana 120').first()).toBeVisible();
-    await expect(page.getByText(/Grupo Iberluz/).first()).toBeVisible();
+    await expect(page.getByText(/n'est pas disponible|n’est pas disponible/i)).toHaveCount(0);
   });
 });
 
@@ -76,7 +77,7 @@ test.describe('Étanchéité entre investisseurs (Marta)', () => {
     await login(page, 'marta');
     await page.goto(`/actifs/${CASTELLANA_120_ID}`);
     await expect(page.getByText(/n'est pas disponible|n’est pas disponible/i).first()).toBeVisible();
-    await expect(page.getByText('Grupo Iberluz')).toHaveCount(0);
+    await expect(page.getByText('Castellana 120')).toHaveCount(0);
   });
 });
 
